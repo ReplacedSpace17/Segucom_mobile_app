@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
-import './Options/Option1.dart'; // Importa la nueva pantalla WebView
+// Importa la nueva pantalla WebView
 import 'package:intl/intl.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Login/login_screen.dart';
 import '../Message/ScreenListChats.dart';
-import '../Mi_perfil/ScreenPerfil.dart';
 
-class MenuScreen extends StatefulWidget {
+
+class PerfilScreen extends StatefulWidget {
   @override
-  _MenuScreenState createState() => _MenuScreenState();
+  _PerfilScreenState createState() => _PerfilScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _PerfilScreenState extends State<PerfilScreen> {
   String _personalId = '947e033a-52c1-4fbe-a8d9-50834dae81ba';
   late Position _currentPosition;
   late DateTime _currentDateTime;
@@ -33,10 +34,11 @@ class _MenuScreenState extends State<MenuScreen> {
     super.initState();
     _currentDateTime = DateTime.now();
     _startClockUpdates(); // Agregar inicio de actualización del reloj
-    _startLocationUpdates();
+   
     _loadNombre();
     _loadTelefono();
     _loadNumElemento();
+    _selectedIndex = 1;
   }
 
 
@@ -152,13 +154,13 @@ void _onItemTapped(int index) {
 
     switch (index) {
       case 0:
-        // Navegar a la pantalla de inicio si es necesario
+         Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => MenuScreen()),
+        );
         break;
       case 1:
-       Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => PerfilScreen()),
-        );
+        // Navegar a la pantalla de perfil si es necesario
         break;
       case 2:
         Navigator.push(
@@ -190,24 +192,17 @@ void _onItemTapped(int index) {
                     fontWeight: FontWeight.w500,
                     color: Color.fromRGBO(120, 120, 120, 1),
                   )),
-              SizedBox(height: 2),
-              Text(
-                '$_nombre',
-                style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromRGBO(63, 63, 63, 1)),
-              ),
+              
               SizedBox(height: 30),
               // Hora y fecha
               Row(
                 children: [
-                  _buildDateTimeCard(),
+                  _buildCardInformation(),
                 ],
               ),
               SizedBox(height: 30),
               Text(
-                'Menú',
+                'Información personal',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w400,
@@ -225,57 +220,10 @@ void _onItemTapped(int index) {
                       Colors.blue,
                       'Descripción de boletinaje',
                       () {
-                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WebViewScreen(
-                                url:
-                                    'https://www.segucom.mx/mobile/grid_ALERTA_MOVIL/?xElemen=$_numElemento', title: 'Alertamientos')
-                               
-                          ),
-                        );
+                    
                       },
                     ),
-                    SizedBox(height: 3),
-                    _buildMenuItem(
-                      'Consignas',
-                      '',
-                      'lib/assets/icons/admin.png',
-                      Colors.green,
-                      'Descripción de consignas',
-                      () {
-                        Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => WebViewScreen(
-      url: 'https://www.segucom.mx/mobile/grid_CONSIGNA_MOVIL/?xElemen=$_numElemento',
-      title: 'Consignas',
-    ),
-  ),
-);
-
-                      },
-                    ),
-                    SizedBox(height: 3),
-                    _buildMenuItem(
-                      'Mi QR',
-                      '',
-                      'lib/assets/icons/qr.png',
-                      Colors.orange,
-                      'Descripción de mi QR',
-                      () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WebViewScreen(
-                              url:
-                                  'https://www.segucom.mx/mobile/grid_QRElemento/?xElemento=$_numElemento',
-                              title: 'QR',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+            
                   ],
                 ),
               ),
@@ -373,10 +321,10 @@ void _onItemTapped(int index) {
     );
   }
 
-  Widget _buildDateTimeCard() {
+  Widget _buildCardInformation() {
     return Container(
       width: MediaQuery.of(context).size.width *
-          0.5, // Define el ancho de la card como la mitad de la pantalla
+          0.89, // Define el ancho de la card como la mitad de la pantalla
       child: Card(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),

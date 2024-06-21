@@ -1,0 +1,335 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../../configBackend.dart';
+import './CallScreen.dart';
+
+class ChatScreen extends StatefulWidget {
+  final Map<String, dynamic> chatData;
+  final String numElemento;
+
+  ChatScreen({required this.chatData, required this.numElemento});
+
+  @override
+  _ChatScreenState createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  List<dynamic> messages = [];
+  TextEditingController messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  late IO.Socket socket;
+
+  @override
+  void initState() {
+    super.initState();
+    socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
+      'transports': ['websocket'],
+    });
+
+    socket.on('receiveMessage', (data) {
+      print('Nuevo mensaje recibido desde servidor: $data');
+      _handleReceivedMessage(data);
+    });
+
+    // Evento para llamadas entrantes
+    socket.on('incomingCall', (data) {
+      String callerName = data['callerName'];
+      //imprimir el nombre del llamante
+      print('Llamada entrante de $callerName');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallScreen(callerName: callerName),
+        ),
+      );
+    });
+
+    socket.connect();
+    fetchMessages();
+  }
+
+  @override
+  void dispose() {
+    socket.off('receiveMessage', _handleReceivedMessage); // Eliminar el evento
+    socket.disconnect();
+    messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> fetchMessages() async {
+    try {
+      final response = await http.get(Uri.parse(
+          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}'));
+
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+
+        if (data.isNotEmpty) {
+          List<dynamic> mensajes = data[0]['MENSAJES'];
+          if (mounted) {
+            setState(() {
+              messages = mensajes
+                  .map((message) => {
+                        'MENSAJE_ID': message['MENSAJE_ID'],
+                        'FECHA': message['FECHA'],
+                        'REMITENTE': message['REMITENTE'],
+                        'MENSAJE': message['MENSAJE'],
+                      })
+                  .toList();
+            });
+            // Asegurar que el scroll se mueva al final de la lista después de renderizar los mensajes
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _scrollToBottom());
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              messages = [];
+            });
+          }
+        }
+      } else {
+        throw Exception('Failed to load messages');
+      }
+    } catch (e) {
+      print('Error fetching messages: $e');
+      // Mostrar un diálogo de error o notificación al usuario
+    }
+  }
+
+  void _handleReceivedMessage(dynamic data) {
+    var receivedMessage = {
+      'MENSAJE_ID': data['MENSAJE_ID'],
+      'FECHA': data['FECHA'],
+      'REMITENTE': data['REMITENTE'],
+      'MENSAJE': data['MENSAJE'],
+    };
+
+    // Verificar si el mensaje ya existe en messages
+    bool messageExists = messages
+        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+
+    if (!messageExists) {
+      if (mounted) {
+        setState(() {
+          messages.add(receivedMessage);
+        });
+        // Asegurar que el scroll se mueva al último mensaje recibido
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
+    }
+  }
+
+  Future<void> sendMessage(String message) async {
+    var currentDate = DateTime.now();
+    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+
+    var requestBody = {
+      "FECHA": formattedDate,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "MENSAJE": message,
+      "MEDIA": ""
+    };
+
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        var newMessage = {
+          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+          'FECHA': formattedDate,
+          'REMITENTE': widget.numElemento,
+          'MENSAJE': message,
+        };
+        // No agregues el mensaje localmente aquí, espera la confirmación del socket
+        socket.emit('sendMessage', newMessage);
+        messageController.clear(); // Limpiar el campo de texto
+      } else {
+        throw Exception('Failed to send message');
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+      // Mostrar un diálogo de error o notificación al usuario
+    }
+  }
+
+  void _scrollToBottom() {
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Widget _buildMessage(Map<String, dynamic> message) {
+    bool isMe = message['REMITENTE'].toString() == widget.numElemento;
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blueAccent : Colors.grey[300],
+          borderRadius: isMe
+              ? BorderRadius.only(
+                  topLeft: Radius.circular(10),
+                  bottomLeft: Radius.circular(10),
+                  topRight: Radius.circular(10),
+                )
+              : BorderRadius.only(
+                  topRight: Radius.circular(10),
+                  bottomRight: Radius.circular(10),
+                  topLeft: Radius.circular(10),
+                ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message['MENSAJE'],
+              style: TextStyle(color: isMe ? Colors.white : Colors.black),
+            ),
+            SizedBox(height: 5),
+            Text(
+              DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
+              style: TextStyle(
+                  color: isMe ? Colors.white70 : Colors.black54, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateSeparator(String date) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          DateFormat('dd/MM/yyyy').format(DateTime.parse(date)),
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: AssetImage('lib/assets/icons/contact.png'),
+              radius: 20,
+            ),
+            SizedBox(width: 16),
+            Text(
+              '${widget.chatData["NOMBRE_COMPLETO"]}',
+              style: TextStyle(fontSize: 18),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.phone),
+            onPressed: () {
+              // Implementar la lógica para iniciar la llamada
+              _initiateCall();
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.videocam),
+            onPressed: () {
+              // Implementar la lógica para iniciar la videollamada
+              _initiateCall(isVideo: true);
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: messages.isEmpty
+                ? Center(child: Text('No hay mensajes disponibles'))
+                : ListView.builder(
+                    controller: _scrollController,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      var message = messages[index];
+                      bool showDateSeparator = false;
+
+                      if (index == 0) {
+                        showDateSeparator = true;
+                      } else {
+                        String prevMessageDate =
+                            messages[index - 1]['FECHA'].split('T')[0];
+                        String currentMessageDate =
+                            message['FECHA'].split('T')[0];
+                        showDateSeparator =
+                            prevMessageDate != currentMessageDate;
+                      }
+
+                      return Column(
+                        children: [
+                          if (showDateSeparator)
+                            _buildDateSeparator(message['FECHA']),
+                          _buildMessage(message),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: messageController,
+                    decoration: InputDecoration(
+                      hintText: 'Escribe un mensaje...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(Icons.send),
+                  onPressed: () {
+                    if (messageController.text.isNotEmpty) {
+                      sendMessage(messageController.text);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+void _initiateCall({bool isVideo = false}) {
+  String event = isVideo ? 'startVideoCall' : 'startVoiceCall';
+  socket.emit(event, {
+    'callerId': widget.numElemento,
+    'receiverId': widget.chatData['ELEMENTO_NUM'],
+    'callerName': widget.chatData['NOMBRE_COMPLETO']
+  });
+}
+
+}
