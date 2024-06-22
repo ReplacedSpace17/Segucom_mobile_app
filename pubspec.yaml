@@ -40,6 +40,7 @@ dependencies:
 
   flutter_webrtc: ^0.10.8 # Usa la versión más reciente compatible
   socket_io_client: ^2.0.0-beta.4
+  audioplayers: ^6.0.0
 
 
 
@@ -72,6 +73,7 @@ flutter:
     - lib/assets/icons/admin.png
     - lib/assets/icons/clock.png
     - lib/assets/icons/contact.png
+    - lib/assets/icons/miPerfil.png
     - lib/assets/icons/MenuIcons/Home.svg
     
 

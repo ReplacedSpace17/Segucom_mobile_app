@@ -216,13 +216,14 @@ void _onItemTapped(int index) {
                     _buildMenuItem(
                       'Boletinaje',
                       '',
-                      'lib/assets/icons/alertas.png',
+                      'lib/assets/icons/miPerfil.png',
                       Colors.blue,
                       'Descripción de boletinaje',
                       () {
                     
                       },
                     ),
+                    
             
                   ],
                 ),
@@ -343,7 +344,7 @@ void _onItemTapped(int index) {
                   color: Color(0xFFF5F4F9),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Image.asset('lib/assets/icons/clock.png'),
+                child: Image.asset('lib/assets/icons/miPerfil.png'),
               ),
               SizedBox(width: 16),
               Column(

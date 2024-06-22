@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../../configBackend.dart';
+import './CallScreen.dart';
 
 class ChatScreen extends StatefulWidget {
   final Map<String, dynamic> chatData;
@@ -33,13 +34,17 @@ class _ChatScreenState extends State<ChatScreen> {
       _handleReceivedMessage(data);
     });
 
+    // Evento para llamadas entrantes
     socket.on('incomingCall', (data) {
-      if (mounted) {
-        setState(() {
-          String callerName = data['callerName'] ?? 'Desconocido';
-          _showIncomingCallAlert(callerName);
-        });
-      }
+      String callerName = data['callerName'];
+      //imprimir el nombre del llamante
+      print('Llamada entrante de $callerName');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallScreen(callerName: callerName),
+        ),
+      );
     });
 
     socket.connect();
@@ -48,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    socket.off('receiveMessage', _handleReceivedMessage);
+    socket.off('receiveMessage', _handleReceivedMessage); // Eliminar el evento
     socket.disconnect();
     messageController.dispose();
     super.dispose();
@@ -75,6 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       })
                   .toList();
             });
+            // Asegurar que el scroll se mueva al final de la lista después de renderizar los mensajes
             WidgetsBinding.instance
                 .addPostFrameCallback((_) => _scrollToBottom());
           }
@@ -90,6 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       print('Error fetching messages: $e');
+      // Mostrar un diálogo de error o notificación al usuario
     }
   }
 
@@ -101,6 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'MENSAJE': data['MENSAJE'],
     };
 
+    // Verificar si el mensaje ya existe en messages
     bool messageExists = messages
         .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
 
@@ -109,6 +117,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           messages.add(receivedMessage);
         });
+        // Asegurar que el scroll se mueva al último mensaje recibido
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
     }
@@ -144,13 +153,15 @@ class _ChatScreenState extends State<ChatScreen> {
           'REMITENTE': widget.numElemento,
           'MENSAJE': message,
         };
+        // No agregues el mensaje localmente aquí, espera la confirmación del socket
         socket.emit('sendMessage', newMessage);
-        messageController.clear();
+        messageController.clear(); // Limpiar el campo de texto
       } else {
         throw Exception('Failed to send message');
       }
     } catch (e) {
       print('Error sending message: $e');
+      // Mostrar un diálogo de error o notificación al usuario
     }
   }
 
@@ -236,12 +247,14 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: Icon(Icons.phone),
             onPressed: () {
+              // Implementar la lógica para iniciar la llamada
               _initiateCall();
             },
           ),
           IconButton(
             icon: Icon(Icons.videocam),
             onPressed: () {
+              // Implementar la lógica para iniciar la videollamada
               _initiateCall(isVideo: true);
             },
           ),
@@ -294,14 +307,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 SizedBox(width: 8),
-                ElevatedButton(
+                IconButton(
+                  icon: Icon(Icons.send),
                   onPressed: () {
-                    String message = messageController.text.trim();
-                    if (message.isNotEmpty) {
-                      sendMessage(message);
+                    if (messageController.text.isNotEmpty) {
+                      sendMessage(messageController.text);
                     }
                   },
-                  child: Text('Enviar'),
                 ),
               ],
             ),
@@ -311,46 +323,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showIncomingCallAlert(String callerName) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Llamada entrante'),
-          content: Text('Tienes una llamada entrante de $callerName'),
-          actions: [
-            TextButton(
-              child: Text('Aceptar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _acceptCall();
-              },
-            ),
-            TextButton(
-              child: Text('Rechazar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _rejectCall();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+void _initiateCall({bool isVideo = false}) {
+  String event = isVideo ? 'startVideoCall' : 'startVoiceCall';
+  socket.emit(event, {
+    'callerId': widget.numElemento,
+    'receiverId': widget.chatData['ELEMENTO_NUM'],
+    'callerName': widget.chatData['NOMBRE_COMPLETO']
+  });
+}
 
-  void _initiateCall({bool isVideo = false}) {
-    print('Iniciando llamada...');
-    // Implementación para iniciar la llamada aquí
-  }
-
-  void _acceptCall() {
-    print('Aceptando llamada...');
-    // Implementación para aceptar la llamada aquí
-  }
-
-  void _rejectCall() {
-    print('Rechazando llamada...');
-    // Implementación para rechazar la llamada aquí
-  }
 }
