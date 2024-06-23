@@ -184,23 +184,11 @@ void _onItemTapped(int index) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Saludo
+              // INSERTAR AQUI EL CONTAINER CON UNA IMAGEN AL CENTRO Y UN TEXTO DEBAJO DE LA IMAGEN 
+
               SizedBox(height: 25),
-              Text('Hola,',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                    color: Color.fromRGBO(120, 120, 120, 1),
-                  )),
               
-              SizedBox(height: 30),
-              // Hora y fecha
-              Row(
-                children: [
-                  _buildCardInformation(),
-                ],
-              ),
-              SizedBox(height: 30),
+        
               Text(
                 'Información personal',
                 style: TextStyle(
@@ -213,18 +201,14 @@ void _onItemTapped(int index) {
               Expanded(
                 child: ListView(
                   children: [
-                    _buildMenuItem(
-                      'Boletinaje',
-                      '',
-                      'lib/assets/icons/miPerfil.png',
-                      Colors.blue,
-                      'Descripción de boletinaje',
-                      () {
-                    
-                      },
-                    ),
-                    
-            
+                  
+                     _buildCardInformation('Nombre','VALOR', 'lib/assets/icons/miPerfil.png'),
+                  
+                     _buildCardInformation('Número elemento','VALOR', 'lib/assets/icons/miPerfil.png'),
+                     
+                       _buildCardInformation('Teléfono','VALOR', 'lib/assets/icons/miPerfil.png'),
+
+                        _buildCardInformation('Contraseña','VALOR', 'lib/assets/icons/miPerfil.png'),
                   ],
                 ),
               ),
@@ -275,54 +259,7 @@ void _onItemTapped(int index) {
     );
   }
 
-  Widget _buildMenuItem(String title, String subtitle, String iconPath,
-      Color color, String description, VoidCallback onTap) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Color(0xFFDCDCDC)),
-      ),
-      color: Colors.white,
-      elevation: 0,
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: Color(0xFF073560),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subtitle.isNotEmpty)
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            SizedBox(height: 30), // Espacio entre el título y la descripción
-            Text(
-              description,
-              style: TextStyle(
-                color: Color(0xFF2F2F2F),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        trailing: Image.asset(
-          iconPath,
-          width: 50,
-          height: 50,
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _buildCardInformation() {
+ Widget _buildCardInformation(String title, String value, String pathIcon) {
     return Container(
       width: MediaQuery.of(context).size.width *
           0.89, // Define el ancho de la card como la mitad de la pantalla
@@ -344,23 +281,23 @@ void _onItemTapped(int index) {
                   color: Color(0xFFF5F4F9),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Image.asset('lib/assets/icons/miPerfil.png'),
+                child: Image.asset(pathIcon),
               ),
               SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _formatTime(_currentDateTime),
+                    title,
                     style: TextStyle(
                       color: Color(0xFF073560),
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                   SizedBox(height: 8), // Espacio entre hora y fecha
                   Text(
-                    _formatDate(_currentDateTime),
+                    value,
                     style: TextStyle(
                       color: Color(0xFF2F2F2F),
                       fontSize: 14,

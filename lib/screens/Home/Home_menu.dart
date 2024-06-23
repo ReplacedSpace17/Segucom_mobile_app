@@ -230,7 +230,7 @@ void _onItemTapped(int index) {
                           MaterialPageRoute(
                             builder: (context) => WebViewScreen(
                                 url:
-                                    'https://www.segucom.mx/mobile/grid_ALERTA_MOVIL/?xElemen=$_numElemento', title: 'Alertamientos')
+                                    'https://www.segucom.mx/mobile/grid_ALERTA_MOVIL/?xElemen=$_numElemento', title: 'Boletinaje')
                                
                           ),
                         );

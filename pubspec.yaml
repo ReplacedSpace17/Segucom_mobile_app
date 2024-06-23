@@ -75,6 +75,9 @@ flutter:
     - lib/assets/icons/contact.png
     - lib/assets/icons/miPerfil.png
     - lib/assets/icons/MenuIcons/Home.svg
+    - lib/assets/icons/password.png
+    - lib/assets/icons/elemento.png
+    - lib/assets/icons/phone.png
     
 
   # An image asset can refer to one or more resolution-specific "variants", see
