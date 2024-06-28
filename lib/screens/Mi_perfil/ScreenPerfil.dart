@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../Login/login_screen.dart';
 import '../Message/ScreenListChats.dart';
 
-
 class PerfilScreen extends StatefulWidget {
   @override
   _PerfilScreenState createState() => _PerfilScreenState();
@@ -22,7 +21,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   String _personalId = '947e033a-52c1-4fbe-a8d9-50834dae81ba';
   late Position _currentPosition;
   late DateTime _currentDateTime;
-   late DateTime _currentDateTimeCARD;
+  late DateTime _currentDateTimeCARD;
   Timer? _timer;
   String _nombre = '';
   String _numElemento = '';
@@ -34,13 +33,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
     super.initState();
     _currentDateTime = DateTime.now();
     _startClockUpdates(); // Agregar inicio de actualización del reloj
-   
+
     _loadNombre();
     _loadTelefono();
     _loadNumElemento();
     _selectedIndex = 1;
   }
-
 
   void _loadNombre() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -68,17 +66,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
     _timer?.cancel();
     super.dispose();
   }
-void _startLocationUpdates() {
-  _timer?.cancel(); // Cancelar el timer anterior si existe
-  _getCurrentLocation();
-  _timer = Timer.periodic(Duration(minutes: 10), (timer) {
-    _getCurrentLocation();
-    setState(() {
-      _currentDateTime = DateTime.now();
-    });
-  });
-}
 
+  void _startLocationUpdates() {
+    _timer?.cancel(); // Cancelar el timer anterior si existe
+    _getCurrentLocation();
+    _timer = Timer.periodic(Duration(minutes: 10), (timer) {
+      _getCurrentLocation();
+      setState(() {
+        _currentDateTime = DateTime.now();
+      });
+    });
+  }
 
   void _startClockUpdates() {
     _timer?.cancel(); // Cancelar el timer anterior si existe
@@ -88,55 +86,52 @@ void _startLocationUpdates() {
     });
   }
 
-
-
   void _getCurrentTime() {
     setState(() {
       _currentDateTime = DateTime.now();
     });
   }
 
-Future<void> _getCurrentLocation() async {
-  try {
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best);
-    setState(() {
-      _currentPosition = position;
-      _currentDateTime = DateTime.now();
-    });
-    await _sendLocationToServer();
-  } catch (e) {
-    print("Error al obtener la ubicación: $e");
-  }
-}
-
-Future<void> _sendLocationToServer() async {
-  if (_currentPosition != null) {
-    final url = Uri.parse(
-        ConfigBackend.backendUrl + '/segucom/api/maps/elemento/' + _tel);
-    final body = {
-      "PersonalID": _personalId,
-      "ELEMENTO_LATITUD": _currentPosition.latitude,
-      "ELEMENTO_LONGITUD": _currentPosition.longitude,
-      "ELEMENTO_ULTIMALOCAL": _currentDateTime.toIso8601String(),
-      "Hora": _formatTime(_currentDateTime),
-      "Fecha": _formatDate(_currentDateTime),
-      "NumTel": _tel,
-    };
-    print(body);
-    final response = await http.put(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    if (response.statusCode == 200) {
-      print('Ubicación enviada al servidor');
-    } else {
-      print('Error al enviar ubicación: ${response.statusCode}');
+  Future<void> _getCurrentLocation() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best);
+      setState(() {
+        _currentPosition = position;
+        _currentDateTime = DateTime.now();
+      });
+      await _sendLocationToServer();
+    } catch (e) {
+      print("Error al obtener la ubicación: $e");
     }
   }
-}
 
+  Future<void> _sendLocationToServer() async {
+    if (_currentPosition != null) {
+      final url = Uri.parse(
+          ConfigBackend.backendUrl + '/segucom/api/maps/elemento/' + _tel);
+      final body = {
+        "PersonalID": _personalId,
+        "ELEMENTO_LATITUD": _currentPosition.latitude,
+        "ELEMENTO_LONGITUD": _currentPosition.longitude,
+        "ELEMENTO_ULTIMALOCAL": _currentDateTime.toIso8601String(),
+        "Hora": _formatTime(_currentDateTime),
+        "Fecha": _formatDate(_currentDateTime),
+        "NumTel": _tel,
+      };
+      print(body);
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        print('Ubicación enviada al servidor');
+      } else {
+        print('Error al enviar ubicación: ${response.statusCode}');
+      }
+    }
+  }
 
   String _formatDate(DateTime dateTime) {
     return "${dateTime.year.toString().padLeft(4, '0')}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
@@ -146,15 +141,14 @@ Future<void> _sendLocationToServer() async {
     return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}";
   }
 
-
-void _onItemTapped(int index) {
+  void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
 
     switch (index) {
       case 0:
-         Navigator.push(
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => MenuScreen()),
         );
@@ -184,11 +178,30 @@ void _onItemTapped(int index) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // INSERTAR AQUI EL CONTAINER CON UNA IMAGEN AL CENTRO Y UN TEXTO DEBAJO DE LA IMAGEN 
+              // Container con imagen centrada y texto debajo
+              Center(
+                child: Column(
+                  children: [
+                    SizedBox(height: 40),
+                    Image.asset(
+                      'lib/assets/icons/iconUser.png',
+                      width: 100, // Puedes ajustar el tamaño de la imagen según sea necesario
+                      height: 100,
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      'Nombre Aqui',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3F3F3F),
+                      ),
+                    ),
 
-              SizedBox(height: 25),
-              
-        
+                  ],
+                ),
+              ),
+              SizedBox(height: 45),
               Text(
                 'Información personal',
                 style: TextStyle(
@@ -201,19 +214,17 @@ void _onItemTapped(int index) {
               Expanded(
                 child: ListView(
                   children: [
-                  
-                     _buildCardInformation('Nombre','VALOR', 'lib/assets/icons/miPerfil.png'),
-                  
-                     _buildCardInformation('Número elemento','VALOR', 'lib/assets/icons/miPerfil.png'),
-                     
-                       _buildCardInformation('Teléfono','VALOR', 'lib/assets/icons/miPerfil.png'),
-
-                        _buildCardInformation('Contraseña','VALOR', 'lib/assets/icons/miPerfil.png'),
+                    _buildCardInformation(
+                        'Nombre', _nombre, 'lib/assets/icons/miPerfil.png'),
+                    _buildCardInformation('Número elemento', _numElemento,
+                        'lib/assets/icons/elemento.png'),
+                    _buildCardInformation(
+                        'Teléfono', _tel, 'lib/assets/icons/phone.png'),
+                    _buildCardInformation('Contraseña', 'VALOR',
+                        'lib/assets/icons/password.png'),
                   ],
                 ),
               ),
-
-              
             ],
           ),
         ),
@@ -232,7 +243,7 @@ void _onItemTapped(int index) {
           selectedItemColor: Color.fromARGB(255, 255, 255, 255),
           unselectedItemColor: Color.fromARGB(179, 173, 173, 173),
           currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+          onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
           showSelectedLabels: false, // Ocultar etiquetas seleccionadas
           showUnselectedLabels: false, // Ocultar etiquetas no seleccionadas
@@ -259,7 +270,7 @@ void _onItemTapped(int index) {
     );
   }
 
- Widget _buildCardInformation(String title, String value, String pathIcon) {
+  Widget _buildCardInformation(String title, String value, String pathIcon) {
     return Container(
       width: MediaQuery.of(context).size.width *
           0.89, // Define el ancho de la card como la mitad de la pantalla
@@ -312,4 +323,3 @@ void _onItemTapped(int index) {
     );
   }
 }
-

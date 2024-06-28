@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:image_picker/image_picker.dart';
 import '../../configBackend.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -20,6 +22,8 @@ class _ChatScreenState extends State<ChatScreen> {
   TextEditingController messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late IO.Socket socket;
+  final ImagePicker _picker = ImagePicker();
+  bool isTyping = false;
 
   @override
   void initState() {
@@ -154,6 +158,59 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendMediaMessage(String filePath, String fileType) async {
+    var currentDate = DateTime.now();
+    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+
+    var requestBody = {
+      "FECHA": formattedDate,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "MENSAJE": '',
+      "MEDIA": filePath,
+      "TIPO_MEDIA": fileType,
+    };
+
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        var newMessage = {
+          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+          'FECHA': formattedDate,
+          'REMITENTE': widget.numElemento,
+          'MENSAJE': filePath,
+          'TIPO_MEDIA': fileType,
+        };
+        socket.emit('sendMessage', newMessage);
+      } else {
+        throw Exception('Failed to send media message');
+      }
+    } catch (e) {
+      print('Error sending media message: $e');
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      await _sendMediaMessage(pickedFile.path, 'image');
+    }
+  }
+
+  Future<void> _recordAudio() async {
+    // Implementación para grabar y enviar un mensaje de audio
+    print('Grabando audio...');
+  }
+
   void _scrollToBottom() {
     _scrollController.animateTo(
       _scrollController.position.maxScrollExtent,
@@ -164,11 +221,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessage(Map<String, dynamic> message) {
     bool isMe = message['REMITENTE'].toString() == widget.numElemento;
+    bool isMedia = message.containsKey('TIPO_MEDIA');
+    String messageText = message['MENSAJE'];
+    String mediaType = isMedia ? message['TIPO_MEDIA'] : '';
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-        padding: EdgeInsets.all(10),
+        margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
+        padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: isMe ? Colors.blueAccent : Colors.grey[300],
           borderRadius: isMe
@@ -187,15 +248,20 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              message['MENSAJE'],
-              style: TextStyle(color: isMe ? Colors.white : Colors.black),
-            ),
-            SizedBox(height: 5),
+            if (isMedia)
+              (mediaType == 'image'
+                  ? Image.file(File(messageText))
+                  : Text('Audio Message')),
+            if (!isMedia)
+              Text(
+                messageText,
+                style: TextStyle(color: isMe ? Colors.white : Colors.black),
+              ),
+            SizedBox(height: 4),
             Text(
               DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
               style: TextStyle(
-                  color: isMe ? Colors.white70 : Colors.black54, fontSize: 12),
+                  color: isMe ? Colors.white70 : Colors.black54, fontSize: 11, fontWeight: FontWeight.w400),
             ),
           ],
         ),
@@ -284,25 +350,57 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Escribe un mensaje...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    String message = messageController.text.trim();
-                    if (message.isNotEmpty) {
-                      sendMessage(message);
-                    }
-                  },
-                  child: Text('Enviar'),
-                ),
+               
+               
+             Expanded(
+  child: TextField(
+    controller: messageController,
+    onChanged: (value) {
+      setState(() {
+        isTyping = value.trim().isNotEmpty;
+      });
+    },
+    decoration: InputDecoration(
+      hintText: 'Escribe un mensaje...',
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20.0),
+        borderSide: BorderSide(
+          color: Color.fromARGB(255, 17, 55, 95), // Color del borde
+          width: 2.0, // Ancho del borde
+        ),
+      ),
+      contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
+      suffixIcon: 
+          IconButton(
+              icon: Icon(Icons.photo),
+              onPressed: _pickImage,
+            ),
+          
+    ),
+  ),
+),
+
+SizedBox(width: 8),
+Container(
+  decoration: BoxDecoration(
+    shape: BoxShape.circle,
+    color: Colors.blue,
+  ),
+  child: IconButton(
+    icon: isTyping ? Icon(Icons.send) : Icon(Icons.mic),
+    onPressed: () {
+      String message = messageController.text.trim();
+      if (message.isNotEmpty) {
+        sendMessage(message);
+      }
+    },
+    color: Colors.white,
+  ),
+),
+
+
               ],
             ),
           ),

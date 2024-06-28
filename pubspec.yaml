@@ -41,7 +41,7 @@ dependencies:
   flutter_webrtc: ^0.10.8 # Usa la versión más reciente compatible
   socket_io_client: ^2.0.0-beta.4
   audioplayers: ^6.0.0
-
+  image_picker: ^0.8.4+4
 
 
 dev_dependencies:
@@ -78,6 +78,7 @@ flutter:
     - lib/assets/icons/password.png
     - lib/assets/icons/elemento.png
     - lib/assets/icons/phone.png
+    - lib/assets/icons/iconUser.png
     
 
   # An image asset can refer to one or more resolution-specific "variants", see
