@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../configBackend.dart';
 import './Chat.dart'; // Importar la pantalla ChatScreen
 
@@ -13,23 +14,39 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   late Future<List<dynamic>> _futureUsers;
   TextEditingController _searchController = TextEditingController();
   String _searchText = '';
+  String _numElemento = '';
 
   @override
   void initState() {
     super.initState();
+    _loadNumElemento();
     _futureUsers = fetchUsers();
   }
 
+  Future<void> _loadNumElemento() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _numElemento = prefs.getString('NumeroElemento') ?? '';
+    });
+    print(_numElemento);
+  }
+
   Future<List<dynamic>> fetchUsers() async {
-    final response = await http.get(
-        Uri.parse('${ConfigBackend.backendUrlComunication}/segucomunication/api/users/80000'));
+    // Asegúrate de que _numElemento esté cargado
+    if (_numElemento.isEmpty) {
+      await _loadNumElemento();
+    }
+
+    final response = await http.get(Uri.parse(
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/users/$_numElemento'));
 
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
       return data
           .map((user) => {
                 'ELEMENTO_NUMERO': user['ELEMENTO_NUMERO'].toString(), // Asegúrate de convertirlo a String
-                'NOMBRE_COMPLETO': '${user['ELEMENTO_NOMBRE']} ${user['ELEMENTO_PATERNO']} ${user['ELEMENTO_MATERNO']}'
+                'NOMBRE_COMPLETO':
+                    '${user['ELEMENTO_NOMBRE']} ${user['ELEMENTO_PATERNO']} ${user['ELEMENTO_MATERNO']}'
               })
           .toList();
     } else {
@@ -108,13 +125,26 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                               MaterialPageRoute(
                                 builder: (context) => ChatScreen(
                                   chatData: chatData,
-                                  numElemento: user['ELEMENTO_NUMERO'],
+                                  numElemento: _numElemento, // Usar el número del usuario actual
                                 ),
                               ),
                             );
                           } catch (e) {
                             print('Error al obtener chat: $e');
-                            // Aquí puedes manejar el error según sea necesario
+                            // En caso de error, aún así navegamos a la pantalla de chat con datos mínimos del usuario
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  chatData: {
+                                    'ELEMENTO_NUM': user['ELEMENTO_NUMERO'],
+                                    'NOMBRE_COMPLETO': user['NOMBRE_COMPLETO'],
+                                    'ULTIMO_MENSAJE': 'No hay mensajes'
+                                  },
+                                  numElemento: _numElemento, // Usar el número del usuario actual
+                                ),
+                              ),
+                            );
                           }
                         },
                       );
@@ -129,32 +159,56 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     );
   }
 
-  Future<Map<String, dynamic>> fetchChatForUser(String elementoNumero) async {
-    final response = await http.get(Uri.parse(
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/$elementoNumero'));
+Future<Map<String, dynamic>> fetchChatForUser(String elementoNumero) async {
+  // Intenta obtener los mensajes para el usuario
+  final response = await http.get(Uri.parse(
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/$elementoNumero'));
 
-    if (response.statusCode == 200) {
-      dynamic responseData = json.decode(response.body);
-      if (responseData is List && responseData.isNotEmpty) {
-        // Suponiendo que la API devuelve una lista de mensajes para el usuario,
-        // aquí podrías acceder al último mensaje o a cualquier otro dato necesario.
-        var lastMessage = responseData.last;
-        return {
-          'ELEMENTO_NUM': lastMessage['ELEMENTO_NUM'],
-          'NOMBRE_COMPLETO': lastMessage['NOMBRE_COMPLETO'],
-          'ULTIMO_MENSAJE': lastMessage['MENSAJES'].isNotEmpty
-              ? lastMessage['MENSAJES'].last['VALUE']
-              : 'No hay mensajes'
-        };
-      } else {
-        throw Exception('No se encontraron mensajes para el usuario $elementoNumero');
-      }
+  // Si la respuesta es exitosa y contiene datos, procese los mensajes
+  if (response.statusCode == 200) {
+    dynamic responseData = json.decode(response.body);
+    if (responseData is List && responseData.isNotEmpty) {
+      var lastMessage = responseData.last;
+      return {
+        'ELEMENTO_NUM': elementoNumero,
+        'NOMBRE_COMPLETO': lastMessage['NOMBRE_COMPLETO'] ?? 'Usuario Desconocido',
+        'ULTIMO_MENSAJE': lastMessage['MENSAJES'].isNotEmpty
+            ? lastMessage['MENSAJES'].last['VALUE']
+            : 'No hay mensajes'
+      };
     } else {
-      throw Exception('Failed to load chat for user $elementoNumero');
+      // Si no hay mensajes, devuelve el nombre completo del usuario desde el endpoint de usuarios
+      return fetchUserInfo(elementoNumero);
     }
+  } else {
+    throw Exception('Failed to load chat for user $elementoNumero');
   }
+}
 
-  @override
+Future<Map<String, dynamic>> fetchUserInfo(String elementoNumero) async {
+  final response = await http.get(Uri.parse(
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/users/$elementoNumero'));
+
+  if (response.statusCode == 200) {
+    dynamic userData = json.decode(response.body).firstWhere((user) => user['ELEMENTO_NUMERO'].toString() == elementoNumero, orElse: () => null);
+    if (userData != null) {
+      return {
+        'ELEMENTO_NUM': userData['ELEMENTO_NUMERO'],
+        'NOMBRE_COMPLETO': '${userData['ELEMENTO_NOMBRE']} ${userData['ELEMENTO_PATERNO']} ${userData['ELEMENTO_MATERNO']}',
+        'ULTIMO_MENSAJE': 'No hay mensajes'
+      };
+    } else {
+      return {
+        'ELEMENTO_NUM': elementoNumero,
+        'NOMBRE_COMPLETO': 'Usuario Desconocido',
+        'ULTIMO_MENSAJE': 'No hay mensajes'
+      };
+    }
+  } else {
+    throw Exception('Failed to load user info for $elementoNumero');
+  }
+}
+@override
   void dispose() {
     _searchController.dispose();
     super.dispose();

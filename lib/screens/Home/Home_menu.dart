@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:segucom_app/screens/Pase_lista/Screen_Pase_Lista.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
@@ -21,7 +22,7 @@ class _MenuScreenState extends State<MenuScreen> {
   String _personalId = '947e033a-52c1-4fbe-a8d9-50834dae81ba';
   late Position _currentPosition;
   late DateTime _currentDateTime;
-   late DateTime _currentDateTimeCARD;
+  late DateTime _currentDateTimeCARD;
   Timer? _timer;
   String _nombre = '';
   String _numElemento = '';
@@ -38,7 +39,6 @@ class _MenuScreenState extends State<MenuScreen> {
     _loadTelefono();
     _loadNumElemento();
   }
-
 
   void _loadNombre() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -66,17 +66,17 @@ class _MenuScreenState extends State<MenuScreen> {
     _timer?.cancel();
     super.dispose();
   }
-void _startLocationUpdates() {
-  _timer?.cancel(); // Cancelar el timer anterior si existe
-  _getCurrentLocation();
-  _timer = Timer.periodic(Duration(minutes: 10), (timer) {
-    _getCurrentLocation();
-    setState(() {
-      _currentDateTime = DateTime.now();
-    });
-  });
-}
 
+  void _startLocationUpdates() {
+    _timer?.cancel(); // Cancelar el timer anterior si existe
+    _getCurrentLocation();
+    _timer = Timer.periodic(Duration(minutes: 10), (timer) {
+      _getCurrentLocation();
+      setState(() {
+        _currentDateTime = DateTime.now();
+      });
+    });
+  }
 
   void _startClockUpdates() {
     _timer?.cancel(); // Cancelar el timer anterior si existe
@@ -86,55 +86,52 @@ void _startLocationUpdates() {
     });
   }
 
-
-
   void _getCurrentTime() {
     setState(() {
       _currentDateTime = DateTime.now();
     });
   }
 
-Future<void> _getCurrentLocation() async {
-  try {
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best);
-    setState(() {
-      _currentPosition = position;
-      _currentDateTime = DateTime.now();
-    });
-    await _sendLocationToServer();
-  } catch (e) {
-    print("Error al obtener la ubicación: $e");
-  }
-}
-
-Future<void> _sendLocationToServer() async {
-  if (_currentPosition != null) {
-    final url = Uri.parse(
-        ConfigBackend.backendUrl + '/segucom/api/maps/elemento/' + _tel);
-    final body = {
-      "PersonalID": _personalId,
-      "ELEMENTO_LATITUD": _currentPosition.latitude,
-      "ELEMENTO_LONGITUD": _currentPosition.longitude,
-      "ELEMENTO_ULTIMALOCAL": _currentDateTime.toIso8601String(),
-      "Hora": _formatTime(_currentDateTime),
-      "Fecha": _formatDate(_currentDateTime),
-      "NumTel": _tel,
-    };
-    print(body);
-    final response = await http.put(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    if (response.statusCode == 200) {
-      print('Ubicación enviada al servidor');
-    } else {
-      print('Error al enviar ubicación: ${response.statusCode}');
+  Future<void> _getCurrentLocation() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best);
+      setState(() {
+        _currentPosition = position;
+        _currentDateTime = DateTime.now();
+      });
+      await _sendLocationToServer();
+    } catch (e) {
+      print("Error al obtener la ubicación: $e");
     }
   }
-}
 
+  Future<void> _sendLocationToServer() async {
+    if (_currentPosition != null) {
+      final url = Uri.parse(
+          ConfigBackend.backendUrl + '/segucom/api/maps/elemento/' + _tel);
+      final body = {
+        "PersonalID": _personalId,
+        "ELEMENTO_LATITUD": _currentPosition.latitude,
+        "ELEMENTO_LONGITUD": _currentPosition.longitude,
+        "ELEMENTO_ULTIMALOCAL": _currentDateTime.toIso8601String(),
+        "Hora": _formatTime(_currentDateTime),
+        "Fecha": _formatDate(_currentDateTime),
+        "NumTel": _tel,
+      };
+      print(body);
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        print('Ubicación enviada al servidor');
+      } else {
+        print('Error al enviar ubicación: ${response.statusCode}');
+      }
+    }
+  }
 
   String _formatDate(DateTime dateTime) {
     return "${dateTime.year.toString().padLeft(4, '0')}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
@@ -144,8 +141,7 @@ Future<void> _sendLocationToServer() async {
     return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}";
   }
 
-
-void _onItemTapped(int index) {
+  void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -155,7 +151,7 @@ void _onItemTapped(int index) {
         // Navegar a la pantalla de inicio si es necesario
         break;
       case 1:
-       Navigator.push(
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => PerfilScreen()),
         );
@@ -168,6 +164,12 @@ void _onItemTapped(int index) {
         break;
       case 3:
         // Navegar a la pantalla de ajustes si es necesario
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => WebViewScreen(
+                  url: 'https://segucom.mx/help/', title: 'Menu de ayuda')),
+        );
         break;
     }
   }
@@ -183,7 +185,7 @@ void _onItemTapped(int index) {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Saludo
-              SizedBox(height: 25),
+              SizedBox(height: 15),
               Text('Hola,',
                   style: TextStyle(
                     fontSize: 22,
@@ -198,14 +200,15 @@ void _onItemTapped(int index) {
                     fontWeight: FontWeight.bold,
                     color: Color.fromRGBO(63, 63, 63, 1)),
               ),
-              SizedBox(height: 30),
+              SizedBox(height: 20),
               // Hora y fecha
               Row(
                 children: [
                   _buildDateTimeCard(),
+                  _buildCardPaseLista(),
                 ],
               ),
-              SizedBox(height: 30),
+              SizedBox(height: 10),
               Text(
                 'Menú',
                 style: TextStyle(
@@ -225,18 +228,17 @@ void _onItemTapped(int index) {
                       Colors.blue,
                       'Descripción de boletinaje',
                       () {
-                       Navigator.push(
+                        Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => WebViewScreen(
-                                url:
-                                    'https://www.segucom.mx/mobile/grid_ALERTA_MOVIL/?xElemen=$_numElemento', title: 'Boletinaje')
-                               
-                          ),
+                              builder: (context) => WebViewScreen(
+                                  url:
+                                      'https://www.segucom.mx/web/grid_ALERTA_MOVIL/?xElemen=$_numElemento',
+                                  title: 'Boletinaje')),
                         );
                       },
                     ),
-                    SizedBox(height: 3),
+
                     _buildMenuItem(
                       'Consignas',
                       '',
@@ -245,18 +247,39 @@ void _onItemTapped(int index) {
                       'Descripción de consignas',
                       () {
                         Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => WebViewScreen(
-      url: 'https://www.segucom.mx/mobile/grid_CONSIGNA_MOVIL/?xElemen=$_numElemento',
-      title: 'Consignas',
-    ),
-  ),
-);
-
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WebViewScreen(
+                              url:
+                                  'https://segucom.mx/web/grid_CONSIGNA_MOV/?xElemen=$_numElemento',
+                              title: 'Consignas',
+                            ),
+                          ),
+                        );
                       },
                     ),
-                    SizedBox(height: 3),
+
+                    //https://www.segucom.mx/mobile/grid_INFORME_POLICIAL/?xElemen=80000
+                    _buildMenuItem(
+                      'Informe Policial',
+                      '',
+                      'lib/assets/icons/informeIcon.png',
+                      Colors.orange,
+                      'Consultar informe policial',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WebViewScreen(
+                              url:
+                                  'https://www.segucom.mx/web/grid_INFORME_MOVIL/?xElemen=$_numElemento',
+                              title: 'QR',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
                     _buildMenuItem(
                       'Mi QR',
                       '',
@@ -269,7 +292,7 @@ void _onItemTapped(int index) {
                           MaterialPageRoute(
                             builder: (context) => WebViewScreen(
                               url:
-                                  'https://www.segucom.mx/mobile/grid_QRElemento/?xElemento=$_numElemento',
+                                  'https://segucom.mx/web/grid_QRElemento_MOVIL/?xElemen=$_numElemento',
                               title: 'QR',
                             ),
                           ),
@@ -279,8 +302,6 @@ void _onItemTapped(int index) {
                   ],
                 ),
               ),
-
-              
             ],
           ),
         ),
@@ -299,7 +320,7 @@ void _onItemTapped(int index) {
           selectedItemColor: Color.fromARGB(255, 255, 255, 255),
           unselectedItemColor: Color.fromARGB(179, 173, 173, 173),
           currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+          onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
           showSelectedLabels: false, // Ocultar etiquetas seleccionadas
           showUnselectedLabels: false, // Ocultar etiquetas no seleccionadas
@@ -425,5 +446,80 @@ void _onItemTapped(int index) {
       ),
     );
   }
-}
 
+  Widget _buildCardPaseLista() {
+    return GestureDetector(
+      onTap: () {
+        // Lógica a ejecutar cuando se presione el Container
+        _validarPaseLista(context, int.parse(_numElemento));
+        print("Container presionado");
+      },
+      child: Container(
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: Color(0xFFDCDCDC)),
+          ),
+          color: Colors.white,
+          elevation: 0,
+          child: Padding(
+            padding: EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF5F4F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.asset('lib/assets/icons/iconPaseLista.png'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+//método para validar si el elemento tiene permisos de hacer el pase de lista
+  Future _validarPaseLista(BuildContext context, int numeroElemento) async {
+    // Mostrar Snackbar de "Verificando permisos"
+    final verifyingSnackBar = SnackBar(
+      content: Text('Verificando permisos...'),
+      duration:
+          Duration(days: 1), // Duración larga hasta que se esconda manualmente
+    );
+    ScaffoldMessenger.of(context).showSnackBar(verifyingSnackBar);
+
+    final url = Uri.parse(ConfigBackend.backendUrl +
+        '/segucom/api/pase_de_lista/validar/' +
+        numeroElemento.toString());
+    final response = await http.get(url);
+    // Ocultar Snackbar de "Verificando permisos"
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (response.statusCode == 200) {
+      //obtener el cuerpo de la respuesta
+      final body = jsonDecode(response.body);
+      final grupoID = body['PASE_ID'];
+      //guardar con shared preferences el grupoID
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setInt('grupoID', grupoID);
+      print(grupoID);
+      //enviar a la pantalla de pase de lista ScreenPaseLista()
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ScreenPaseLista()),
+      );
+    } else {
+      //mostrar un mensaje de que no tiene permisos
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No tiene permisos para efectuar el pase de lista'),
+        ),
+      );
+    }
+  }
+}

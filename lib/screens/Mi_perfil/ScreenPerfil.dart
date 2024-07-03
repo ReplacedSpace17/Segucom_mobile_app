@@ -26,7 +26,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   String _nombre = '';
   String _numElemento = '';
   String _tel = '';
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
 
   @override
   void initState() {
@@ -190,7 +190,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     ),
                     SizedBox(height: 20),
                     Text(
-                      'Nombre Aqui',
+                      _nombre,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,

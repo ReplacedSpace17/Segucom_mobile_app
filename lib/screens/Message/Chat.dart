@@ -7,7 +7,12 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
 import '../../configBackend.dart';
 
+
+
 class ChatScreen extends StatefulWidget {
+
+  //audio
+  
   final Map<String, dynamic> chatData;
   final String numElemento;
 
@@ -25,6 +30,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final ImagePicker _picker = ImagePicker();
   bool isTyping = false;
 
+
+// Variables para la grabación de audio
+ 
+  bool _isRecording = false;
+  String? _recordedFilePath;
+
   @override
   void initState() {
     super.initState();
@@ -37,86 +48,152 @@ class _ChatScreenState extends State<ChatScreen> {
       _handleReceivedMessage(data);
     });
 
-    socket.on('incomingCall', (data) {
-      if (mounted) {
-        setState(() {
-          String callerName = data['callerName'] ?? 'Desconocido';
-          _showIncomingCallAlert(callerName);
-        });
-      }
-    });
+   
 
     socket.connect();
     fetchMessages();
+
+
+// Inicializar el grabador de sonido
+   
+
   }
+
+ 
 
   @override
   void dispose() {
     socket.off('receiveMessage', _handleReceivedMessage);
     socket.disconnect();
     messageController.dispose();
+    
+   
     super.dispose();
   }
 
-  Future<void> fetchMessages() async {
-    try {
-      final response = await http.get(Uri.parse(
-          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}'));
+//////////////////////// audio
+///
+// Método para grabar audio
+Future<void> _recordAudio() async {
+  
+}
 
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
 
-        if (data.isNotEmpty) {
-          List<dynamic> mensajes = data[0]['MENSAJES'];
-          if (mounted) {
-            setState(() {
-              messages = mensajes
-                  .map((message) => {
-                        'MENSAJE_ID': message['MENSAJE_ID'],
-                        'FECHA': message['FECHA'],
-                        'REMITENTE': message['REMITENTE'],
-                        'MENSAJE': message['MENSAJE'],
-                      })
-                  .toList();
-            });
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _scrollToBottom());
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              messages = [];
-            });
-          }
-        }
-      } else {
-        throw Exception('Failed to load messages');
-      }
-    } catch (e) {
-      print('Error fetching messages: $e');
-    }
-  }
+  // Método para enviar el mensaje de audio
+  Future<void> _sendAudioMessage(String filePath) async {
+    var currentDate = DateTime.now();
+    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
-  void _handleReceivedMessage(dynamic data) {
-    var receivedMessage = {
-      'MENSAJE_ID': data['MENSAJE_ID'],
-      'FECHA': data['FECHA'],
-      'REMITENTE': data['REMITENTE'],
-      'MENSAJE': data['MENSAJE'],
+    var requestBody = {
+      "FECHA": formattedDate,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "MENSAJE": '',
+      "MEDIA": filePath,
+      "TIPO_MEDIA": "AUDIO",
     };
 
-    bool messageExists = messages
-        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/audio/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
 
-    if (!messageExists) {
-      if (mounted) {
-        setState(() {
-          messages.add(receivedMessage);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      request.files.add(await http.MultipartFile.fromPath('audio', filePath));
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        var responseData = json.decode(response.body);
+        var audioUrl = responseData['audioUrl'];
+        audioUrl = '${ConfigBackend.backendUrlComunication}$audioUrl';
+        var newMessage = {
+          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+          'FECHA': formattedDate,
+          'REMITENTE': widget.numElemento,
+          'MENSAJE': audioUrl.toString(),
+          'MEDIA': 'AUDIO',
+          'UBICACION': audioUrl.toString(),
+        };
+        socket.emit('sendMessage', newMessage);
+      } else {
+        throw Exception('Failed to send audio message');
       }
+    } catch (e) {
+      print('Error sending audio message: $e');
     }
   }
+
+Future<void> fetchMessages() async {
+  try {
+    final response = await http.get(Uri.parse(
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+
+      if (data.isNotEmpty) {
+        List<dynamic> mensajes = data[0]['MENSAJES'];
+        if (mounted) {
+          setState(() {
+            messages = mensajes.map((message) {
+              // Convertir URL de imagen a absoluta si es una imagen
+              if (message['MEDIA'] == 'IMAGE') {
+                message['MENSAJE'] = '${ConfigBackend.backendUrlComunication}${message['UBICACION']}';
+              }
+              return {
+                'MENSAJE_ID': message['MENSAJE_ID'],
+                'FECHA': message['FECHA'],
+                'REMITENTE': message['REMITENTE'],
+                'MENSAJE': message['MENSAJE'],
+                'MEDIA': message['MEDIA'],
+                'UBICACION': message['UBICACION'],
+              };
+            }).toList();
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            messages = [];
+          });
+        }
+      }
+    } else {
+      throw Exception('Failed to load messages');
+    }
+  } catch (e) {
+    print('Error fetching messages: $e');
+  }
+}
+
+
+void _handleReceivedMessage(dynamic data) {
+  var receivedMessage = {
+    'MENSAJE_ID': data['MENSAJE_ID'],
+    'FECHA': data['FECHA'],
+    'REMITENTE': data['REMITENTE'],
+    'MENSAJE': data['MENSAJE'],
+    'MEDIA': data['MEDIA'],
+    'UBICACION': data['UBICACION'],
+  };
+
+  bool messageExists = messages.any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+
+  if (!messageExists) {
+    if (mounted) {
+      setState(() {
+        if (receivedMessage['MEDIA'] == 'IMAGE') {
+          // Ajustar la URL completa del servidor
+          receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+        }
+        messages.add(receivedMessage);
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+  }
+}
+
 
   Future<void> sendMessage(String message) async {
     var currentDate = DateTime.now();
@@ -126,7 +203,8 @@ class _ChatScreenState extends State<ChatScreen> {
       "FECHA": formattedDate,
       "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
       "MENSAJE": message,
-      "MEDIA": ""
+      "MEDIA": "TXT",
+      "UBICACION": "NA"
     };
 
     var url =
@@ -158,58 +236,66 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendMediaMessage(String filePath, String fileType) async {
-    var currentDate = DateTime.now();
-    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+Future<void> _sendMediaMessage(String filePath, String fileType) async {
+  var currentDate = DateTime.now();
+  var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
-    var requestBody = {
-      "FECHA": formattedDate,
-      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
-      "MENSAJE": '',
-      "MEDIA": filePath,
-      "TIPO_MEDIA": fileType,
-    };
+  var requestBody = {
+    "FECHA": formattedDate,
+    "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+    "MENSAJE": '',
+    "MEDIA": filePath,
+    "TIPO_MEDIA": fileType,
+    "UBICACION": "NA"
+  };
 
-    var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
+  var url =
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
 
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(requestBody),
-      );
+  try {
+    // Convertir el requestBody a formato JSON
+    var requestBodyJson = jsonEncode(requestBody);
 
-      if (response.statusCode == 200) {
-        var newMessage = {
-          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
-          'FECHA': formattedDate,
-          'REMITENTE': widget.numElemento,
-          'MENSAJE': filePath,
-          'TIPO_MEDIA': fileType,
-        };
-        socket.emit('sendMessage', newMessage);
-      } else {
-        throw Exception('Failed to send media message');
-      }
-    } catch (e) {
-      print('Error sending media message: $e');
+    // Preparar la solicitud HTTP con la imagen y el requestBody
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+    request.files.add(await http.MultipartFile.fromPath('image', filePath));
+    request.fields['data'] = requestBodyJson;  // Incluir el requestBody como campo
+
+    // Enviar la solicitud y obtener la respuesta
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      var responseData = json.decode(response.body);
+      var imageUrl = responseData['imageUrl'];  // Asegúrate de verificar el campo de respuesta
+      // Concatenar la URL con el backend
+      imageUrl = '${ConfigBackend.backendUrlComunication}$imageUrl';
+      var newMessage = {
+        'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+        'FECHA': formattedDate,
+        'REMITENTE': widget.numElemento,
+        'MENSAJE': '',  // Asegúrate de convertir imageUrl a String si es necesario
+        'MEDIA': 'IMAGE',
+        'UBICACION': imageUrl.toString(),  // Asegúrate de incluir la URL completa aquí
+      };
+      socket.emit('sendMessage', newMessage);
+    } else {
+      throw Exception('Failed to send media message');
     }
+  } catch (e) {
+    print('Error sending media message: $e');
   }
+}
 
-  Future<void> _pickImage() async {
+
+Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       await _sendMediaMessage(pickedFile.path, 'image');
     }
   }
 
-  Future<void> _recordAudio() async {
-    // Implementación para grabar y enviar un mensaje de audio
-    print('Grabando audio...');
-  }
+
 
   void _scrollToBottom() {
     _scrollController.animateTo(
@@ -219,11 +305,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessage(Map<String, dynamic> message) {
+Widget _buildMessage(Map<String, dynamic> message) {
     bool isMe = message['REMITENTE'].toString() == widget.numElemento;
-    bool isMedia = message.containsKey('TIPO_MEDIA');
+    bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
+    bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
     String messageText = message['MENSAJE'];
-    String mediaType = isMedia ? message['TIPO_MEDIA'] : '';
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -249,10 +335,20 @@ class _ChatScreenState extends State<ChatScreen> {
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (isMedia)
-              (mediaType == 'image'
-                  ? Image.file(File(messageText))
-                  : Text('Audio Message')),
-            if (!isMedia)
+              Image.network(
+                messageText,
+                width: 200,
+                height: 200,
+                fit: BoxFit.cover,
+              ),
+            if (isAudio)
+              IconButton(
+                icon: Icon(Icons.play_arrow),
+                onPressed: () {
+                  // Implementación para reproducir el audio
+                },
+              ),
+            if (!isMedia && !isAudio)
               Text(
                 messageText,
                 style: TextStyle(color: isMe ? Colors.white : Colors.black),
@@ -261,14 +357,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Text(
               DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
               style: TextStyle(
-                  color: isMe ? Colors.white70 : Colors.black54, fontSize: 11, fontWeight: FontWeight.w400),
+                  color: isMe ? Colors.white70 : Colors.black54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400),
             ),
           ],
         ),
       ),
     );
   }
-
+  
   Widget _buildDateSeparator(String date) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -302,13 +400,13 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: Icon(Icons.phone),
             onPressed: () {
-              _initiateCall();
+              
             },
           ),
           IconButton(
             icon: Icon(Icons.videocam),
             onPressed: () {
-              _initiateCall(isVideo: true);
+             
             },
           ),
         ],
@@ -350,57 +448,55 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-               
-               
-             Expanded(
-  child: TextField(
-    controller: messageController,
-    onChanged: (value) {
-      setState(() {
-        isTyping = value.trim().isNotEmpty;
-      });
-    },
-    decoration: InputDecoration(
-      hintText: 'Escribe un mensaje...',
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20.0),
-        borderSide: BorderSide(
-          color: Color.fromARGB(255, 17, 55, 95), // Color del borde
-          width: 2.0, // Ancho del borde
-        ),
-      ),
-      contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
-      suffixIcon: 
-          IconButton(
-              icon: Icon(Icons.photo),
-              onPressed: _pickImage,
-            ),
-          
-    ),
-  ),
-),
-
-SizedBox(width: 8),
-Container(
-  decoration: BoxDecoration(
-    shape: BoxShape.circle,
-    color: Colors.blue,
-  ),
-  child: IconButton(
-    icon: isTyping ? Icon(Icons.send) : Icon(Icons.mic),
-    onPressed: () {
-      String message = messageController.text.trim();
-      if (message.isNotEmpty) {
-        sendMessage(message);
-      }
-    },
-    color: Colors.white,
-  ),
-),
-
-
+                Expanded(
+                  child: TextField(
+                    controller: messageController,
+                    onChanged: (value) {
+                      setState(() {
+                        isTyping = value.trim().isNotEmpty;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Escribe un mensaje...',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20.0),
+                        borderSide: BorderSide(
+                          color: Color.fromARGB(
+                              255, 17, 55, 95), // Color del borde
+                          width: 2.0, // Ancho del borde
+                        ),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                          vertical: 10.0, horizontal: 15.0),
+                      suffixIcon: IconButton(
+                        icon: Icon(Icons.photo),
+                        onPressed: _pickImage,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue,
+                  ),
+                  child: IconButton(
+                    icon: isTyping ? Icon(Icons.send) : Icon(Icons.mic),
+                    onPressed: () {
+                      String message = messageController.text.trim();
+                      if (message.isNotEmpty) {
+                        sendMessage(message);
+                      }
+                      else {
+                        _recordAudio();
+                      }
+                    },
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
@@ -409,46 +505,5 @@ Container(
     );
   }
 
-  void _showIncomingCallAlert(String callerName) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Llamada entrante'),
-          content: Text('Tienes una llamada entrante de $callerName'),
-          actions: [
-            TextButton(
-              child: Text('Aceptar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _acceptCall();
-              },
-            ),
-            TextButton(
-              child: Text('Rechazar'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _rejectCall();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  void _initiateCall({bool isVideo = false}) {
-    print('Iniciando llamada...');
-    // Implementación para iniciar la llamada aquí
-  }
-
-  void _acceptCall() {
-    print('Aceptando llamada...');
-    // Implementación para aceptar la llamada aquí
-  }
-
-  void _rejectCall() {
-    print('Rechazando llamada...');
-    // Implementación para rechazar la llamada aquí
-  }
 }
