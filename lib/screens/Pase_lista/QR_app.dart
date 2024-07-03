@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-import 'package:segucom_app/configBackend.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
+import 'package:segucom_app/screens/Pase_lista/QR_app.dart';
+import 'package:segucom_app/screens/Pase_lista/Screen_Pase_Lista.dart';
+import 'dart:convert';
+import 'dart:async';
+import '../../configBackend.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Login/login_screen.dart';
+import '../Message/ScreenListChats.dart';
+import '../Mi_perfil/ScreenPerfil.dart';
 
 class Elemento {
   final String nombre;
@@ -36,26 +43,81 @@ class ScreenScanQR extends StatefulWidget {
 }
 
 class _ScreenScanQRState extends State<ScreenScanQR> {
-  List<Elemento> elementos = [];
+   List<Elemento> elementos = [];
   List<int> elementosPresentes = []; // Lista de números de elementos presentes
   String qrResult = '';
+
 
   @override
   void initState() {
     super.initState();
-    _fetchElementosInicial(); // Llamar a _fetchElementos al iniciar la pantalla
+    _fetchElementosInicial();
+    // Agregar inicio de actualización del reloj
   }
 
   @override
+  void dispose() {
+  
+    super.dispose();
+  }
+
+  
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Escanear QR'),
+      backgroundColor: Color(0xFFF6F6F6),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Saludo
+              SizedBox(height: 15),
+              Text('Bienvendio/a al',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
+                    color: Color.fromRGBO(120, 120, 120, 1),
+                  )),
+              SizedBox(height: 2),
+              Text(
+                'Pase de Lista',
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromRGBO(63, 63, 63, 1)),
+              ),
+              SizedBox(height: 20),
+              // Hora y fecha
+             
+              SizedBox(height: 10),
+              Text(
+                'Elementos asigandos',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF073560)),
+              ),
+             SizedBox(height: 10),
+// Menú
+Expanded(
+  child: ListView(
+    children: [
+      _buildMenuItem(
+        'Iniciar Pase de Lista',
+        '',
+        'lib/assets/icons/alertas.png',
+        Colors.blue,
+        'Selecciona para comenzar',
+        () async {
+        },
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
+    ],
+  ),
+),
+
+Expanded(
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: elementos.length,
@@ -72,23 +134,84 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
             ),
           ),
           Container(
-            alignment: Alignment.center,
-            padding: EdgeInsets.all(20),
-            child: ElevatedButton(
-              onPressed: () {
-                _scanQR(context);
-              },
-              child: Text('Escanear QR'),
-            ),
+      alignment: Alignment.center,
+      padding: EdgeInsets.all(20),
+      child: ElevatedButton(
+        onPressed: () {
+          _scanQR(context);
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Color(0xFF1C538E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
+          minimumSize: Size(MediaQuery.of(context).size.width * 0.9, 50), // Adjust the height if needed
+        ),
+        child: Icon(
+          Icons.qr_code,
+          color: Colors.white,
+        ),
+      ),
+    ),
           SizedBox(height: 20),
+
+          
           ElevatedButton(
             onPressed: () {
               _cerrarPaseDeLista();
             },
             child: Text('Cerrar pase de lista'),
           ),
-        ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(String title, String subtitle, String iconPath,
+      Color color, String description, VoidCallback onTap) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Color(0xFFDCDCDC)),
+      ),
+      color: Colors.white,
+      elevation: 0,
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: Color(0xFF073560),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (subtitle.isNotEmpty)
+              Text(
+                subtitle,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            SizedBox(height: 30), // Espacio entre el título y la descripción
+            Text(
+              description,
+              style: TextStyle(
+                color: Color(0xFF2F2F2F),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        trailing: Image.asset(
+          iconPath,
+          width: 50,
+          height: 50,
+        ),
+        onTap: onTap,
       ),
     );
   }
@@ -110,7 +233,7 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
             _actualizarElementosPresentes(numeroElemento);
             _eliminarElemento(numeroElemento);
           } else {
-            _mostrarAlerta(context, "El QR no corresponde a un elemento válido.");
+            _mostrarAlerta(context, "El QR no corresponde a un elemento del grupo.");
           }
         } else {
           _mostrarAlerta(context, "El QR escaneado no es válido.");
@@ -170,11 +293,11 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Resultado del escaneo QR'),
-          content: Text(qrResult),
+          title: Text('Elemento escaneado'),
+          content: Text('Número de elemento: ' + qrResult),
           actions: <Widget>[
             TextButton(
-              child: Text('OK'),
+              child: Text('Continuar escaneando'),
               onPressed: () {
                 Navigator.of(context).pop(); // Cierra el diálogo
               },
@@ -194,7 +317,7 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
           content: Text(mensaje),
           actions: <Widget>[
             TextButton(
-              child: Text('OK'),
+              child: Text('Aceptar'),
               onPressed: () {
                 Navigator.of(context).pop(); // Cierra el diálogo
               },
@@ -230,12 +353,4 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
       MaterialPageRoute(builder: (context) => MenuScreen()),
     );
   }
-}
-
-
-
-void main() {
-  runApp(MaterialApp(
-    home: ScreenScanQR(),
-  ));
 }
