@@ -74,7 +74,7 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
             children: [
               // Saludo
               SizedBox(height: 15),
-              Text('Bienvendio/a al',
+              Text('Bienvenido/a al',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w500,
@@ -100,42 +100,24 @@ class _ScreenScanQRState extends State<ScreenScanQR> {
                     color: Color(0xFF073560)),
               ),
              SizedBox(height: 10),
-// Menú
 Expanded(
-  child: ListView(
-    children: [
-      _buildMenuItem(
-        'Iniciar Pase de Lista',
-        '',
-        'lib/assets/icons/alertas.png',
-        Colors.blue,
-        'Selecciona para comenzar',
-        () async {
-        },
-      ),
-    ],
+  child: ListView.builder(
+    shrinkWrap: true,
+    itemCount: elementos.length,
+    itemBuilder: (context, index) {
+      return _buildCardInformation(
+        '${elementos[index].nombre} ${elementos[index].apellidoPaterno} ',
+        'Numero de elemento: ' + elementos[index].numeroElemento.toString(),
+        'lib/assets/icons/miPerfil.png',
+      );
+    },
   ),
 ),
 
-Expanded(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: elementos.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(
-                    '${elementos[index].nombre} ${elementos[index].apellidoPaterno} ${elementos[index].apellidoMaterno}',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle:
-                      Text('Elemento número: ${elementos[index].numeroElemento}'),
-                );
-              },
-            ),
-          ),
+
           Container(
       alignment: Alignment.center,
-      padding: EdgeInsets.all(20),
+      padding: EdgeInsets.all(10),
       child: ElevatedButton(
         onPressed: () {
           _scanQR(context);
@@ -153,15 +135,27 @@ Expanded(
         ),
       ),
     ),
-          SizedBox(height: 20),
-
           
-          ElevatedButton(
-            onPressed: () {
-              _cerrarPaseDeLista();
-            },
-            child: Text('Cerrar pase de lista'),
+Container(
+      alignment: Alignment.center,
+      padding: EdgeInsets.all(10),
+      child: ElevatedButton(
+        onPressed: () {
+          _cerrarPaseDeLista();
+        },
+        style: ElevatedButton.styleFrom(
+          foregroundColor: Color(0xFF073560), backgroundColor: Colors.white, // Text color
+          side: BorderSide(color: Color(0xFF073560), width: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
+          minimumSize: Size(MediaQuery.of(context).size.width * 0.9, 50), // Adjust the height if needed
+        ),
+        child: Text('Cerrar pase de lista'),
+      ),
+    ),
+          SizedBox(height: 10),
+        
             ],
           ),
         ),
@@ -169,54 +163,7 @@ Expanded(
     );
   }
 
-  Widget _buildMenuItem(String title, String subtitle, String iconPath,
-      Color color, String description, VoidCallback onTap) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Color(0xFFDCDCDC)),
-      ),
-      color: Colors.white,
-      elevation: 0,
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: Color(0xFF073560),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (subtitle.isNotEmpty)
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            SizedBox(height: 30), // Espacio entre el título y la descripción
-            Text(
-              description,
-              style: TextStyle(
-                color: Color(0xFF2F2F2F),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        trailing: Image.asset(
-          iconPath,
-          width: 50,
-          height: 50,
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Future<void> _scanQR(BuildContext context) async {
+ Future<void> _scanQR(BuildContext context) async {
     try {
       String result = await FlutterBarcodeScanner.scanBarcode(
           "#ff6666", "Cancelar", true, ScanMode.QR);
@@ -353,4 +300,59 @@ Expanded(
       MaterialPageRoute(builder: (context) => MenuScreen()),
     );
   }
+
+
+    Widget _buildCardInformation(String title, String value, String pathIcon) {
+    return Container(
+      width: MediaQuery.of(context).size.width *
+          0.89, // Define el ancho de la card como la mitad de la pantalla
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: Color(0xFFDCDCDC)),
+        ),
+        color: Colors.white,
+        elevation: 0,
+        child: Padding(
+          padding: EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Color(0xFFF5F4F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Image.asset(pathIcon),
+              ),
+              SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Color(0xFF073560),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  SizedBox(height: 8), // Espacio entre hora y fecha
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: Color(0xFF2F2F2F),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
 }

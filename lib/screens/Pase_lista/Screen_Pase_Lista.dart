@@ -125,7 +125,7 @@ class _ScreenPaseListaState extends State<ScreenPaseLista> {
             children: [
               // Saludo
               SizedBox(height: 15),
-              Text('Bienvendio/a al',
+              Text('Bienvenido/a al',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w500,
@@ -162,7 +162,7 @@ Expanded(
       _buildMenuItem(
         'Iniciar Pase de Lista',
         '',
-        'lib/assets/icons/alertas.png',
+        'lib/assets/icons/iconPaseLista.png',
         Colors.blue,
         'Selecciona para comenzar',
         () async {
