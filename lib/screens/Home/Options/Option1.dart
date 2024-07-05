@@ -15,6 +15,7 @@ class WebViewScreen extends StatelessWidget {
       ),
       url: url,
       withJavascript: true,
+      debuggingEnabled: true,
       // Otros parámetros opcionales
     );
   }

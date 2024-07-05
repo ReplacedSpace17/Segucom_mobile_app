@@ -118,6 +118,7 @@ class _MenuScreenState extends State<MenuScreen> {
         "Hora": _formatTime(_currentDateTime),
         "Fecha": _formatDate(_currentDateTime),
         "NumTel": _tel,
+        "ELEMENTO_NUM": _numElemento,
       };
       print(body);
       final response = await http.put(
@@ -151,20 +152,20 @@ class _MenuScreenState extends State<MenuScreen> {
         // Navegar a la pantalla de inicio si es necesario
         break;
       case 1:
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => PerfilScreen()),
         );
         break;
       case 2:
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => ChatListScreen()),
         );
         break;
       case 3:
         // Navegar a la pantalla de ajustes si es necesario
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
               builder: (context) => WebViewScreen(
@@ -233,6 +234,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           MaterialPageRoute(
                               builder: (context) => WebViewScreen(
                                   url:
+                                      //'https://segucom.mx/fotos/viewFotos.html?category=Boletines&id_data=2',
                                       'https://www.segucom.mx/web/grid_ALERTA_MOVIL/?xElemen=$_numElemento',
                                   title: 'Boletinaje')),
                         );

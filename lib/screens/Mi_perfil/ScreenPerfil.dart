@@ -148,16 +148,17 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
     switch (index) {
       case 0:
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => MenuScreen()),
-        );
+        Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (context) => MenuScreen()),
+);
+
         break;
       case 1:
         // Navegar a la pantalla de perfil si es necesario
         break;
       case 2:
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => ChatListScreen()),
         );
@@ -220,7 +221,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         'lib/assets/icons/elemento.png'),
                     _buildCardInformation(
                         'Teléfono', _tel, 'lib/assets/icons/phone.png'),
-                    _buildCardInformation('Contraseña', 'VALOR',
+                    _buildCardInformation('Contraseña', '*********',
                         'lib/assets/icons/password.png'),
                   ],
                 ),
