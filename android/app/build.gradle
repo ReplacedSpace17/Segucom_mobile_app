@@ -33,6 +33,7 @@ if (keystorePropertiesFile.exists()) {
 
 
 android {
+    compileSdkVersion 34
     namespace "com.segucom.segucom_app"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
@@ -52,7 +53,8 @@ android {
 
     defaultConfig {
         applicationId "com.segucom.segucom_app"
-        minSdkVersion 21
+        minSdkVersion 34
+        targetSdkVersion 34
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

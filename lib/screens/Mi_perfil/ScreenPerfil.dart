@@ -5,12 +5,11 @@ import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
-// Importa la nueva pantalla WebView
 import 'package:intl/intl.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Login/login_screen.dart';
 import '../Message/ScreenListChats.dart';
+import 'UpdatePassword.dart'; // Importa la nueva pantalla
 
 class PerfilScreen extends StatefulWidget {
   @override
@@ -149,10 +148,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
     switch (index) {
       case 0:
         Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(builder: (context) => MenuScreen()),
-);
-
+          context,
+          MaterialPageRoute(builder: (context) => MenuScreen()),
+        );
         break;
       case 1:
         // Navegar a la pantalla de perfil si es necesario
@@ -198,7 +196,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         color: Color(0xFF3F3F3F),
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -223,6 +220,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         'Teléfono', _tel, 'lib/assets/icons/phone.png'),
                     _buildCardInformation('Contraseña', '*********',
                         'lib/assets/icons/password.png'),
+                    SizedBox(height: 10), // Espacio adicional entre las cards y el botón
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => UpdatePasswordScreen("8088")),
+                          );
+                        },
+                        child: Text('Cambiar Contraseña'),
+                      ),
+                    ),
                   ],
                 ),
               ),

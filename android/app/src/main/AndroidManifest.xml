@@ -11,8 +11,19 @@
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 <uses-permission android:name="android.permission.VIBRATE" />
 
+<!-- required -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+<!-- foregroundServiceType: dataSync -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+<!-- foregroundServiceType: remoteMessaging -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+ <!-- Choose this based on the foreground services list from above -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <application
+        android:requestLegacyExternalStorage="true"
         android:label="segucom_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"

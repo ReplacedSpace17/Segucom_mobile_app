@@ -29,6 +29,10 @@ class _MenuScreenState extends State<MenuScreen> {
   String _tel = '';
   int _selectedIndex = 0;
 
+  //numero de consignas y boletines no leidos
+  int _numConsignas = 0;
+  int _numBoletines = 0;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +42,35 @@ class _MenuScreenState extends State<MenuScreen> {
     _loadNombre();
     _loadTelefono();
     _loadNumElemento();
+    //obtener notificaciones
+    //obtener notificaciones
+    _getNotifications();
+    
+  }
+
+  Future<void> _getNotifications() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    String Numero_elemento = prefs.getString('NumeroElemento') ?? '';
+
+   final url = Uri.parse(
+          ConfigBackend.backendUrl + '/segucom/api/user/boletines/' + Numero_elemento);
+     //imprimir a consola la url
+      print(url);
+      final response = await http.get(
+        url,
+        headers: {'Content-Type': 'application/json'});
+      if (response.statusCode == 200) {
+        //obtener el cuerpo de la respuesta
+        final body = jsonDecode(response.body);
+        print(body);
+        //set a numConsignas y numBoletines
+        setState(() {
+          _numConsignas = body['Consignas'];
+          _numBoletines = body['Boletines'];
+        });
+      } else {
+        print('Error al enviar ubicación: ${response.statusCode}');
+      }
   }
 
   void _loadNombre() async {
@@ -52,6 +85,7 @@ class _MenuScreenState extends State<MenuScreen> {
     setState(() {
       _numElemento = prefs.getString('NumeroElemento') ?? '';
     });
+    
   }
 
   void _loadTelefono() async {
@@ -152,20 +186,20 @@ class _MenuScreenState extends State<MenuScreen> {
         // Navegar a la pantalla de inicio si es necesario
         break;
       case 1:
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => PerfilScreen()),
         );
         break;
       case 2:
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => ChatListScreen()),
         );
         break;
       case 3:
         // Navegar a la pantalla de ajustes si es necesario
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(
               builder: (context) => WebViewScreen(
@@ -224,7 +258,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   children: [
                     _buildMenuItem(
                       'Boletinaje',
-                      '',
+                      '$_numBoletines no leídos',
                       'lib/assets/icons/alertas.png',
                       Colors.blue,
                       'Descripción de boletinaje',
@@ -243,7 +277,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
                     _buildMenuItem(
                       'Consignas',
-                      '',
+                      '$_numConsignas no leídas',
                       'lib/assets/icons/admin.png',
                       Colors.green,
                       'Descripción de consignas',
@@ -275,7 +309,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             builder: (context) => WebViewScreen(
                               url:
                                   'https://www.segucom.mx/web/grid_INFORME_MOVIL/?xElemen=$_numElemento',
-                              title: 'QR',
+                              title: 'Informe Policial',
                             ),
                           ),
                         );
@@ -295,7 +329,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             builder: (context) => WebViewScreen(
                               url:
                                   'https://segucom.mx/web/grid_QRElemento_MOVIL/?xElemen=$_numElemento',
-                              title: 'QR',
+                              title: 'Mi QR',
                             ),
                           ),
                         );
@@ -376,7 +410,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 subtitle,
                 style: TextStyle(color: Colors.grey[600]),
               ),
-            SizedBox(height: 30), // Espacio entre el título y la descripción
+            SizedBox(height: 20), // Espacio entre el título y la descripción
             Text(
               description,
               style: TextStyle(

@@ -1,11 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
 import '../../configBackend.dart';
+
+
+
+import 'package:flutter_sound/flutter_sound.dart';
+
 
 
 
@@ -32,13 +41,35 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
 // Variables para la grabación de audio
- 
+ FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  FlutterSoundPlayer _player = FlutterSoundPlayer();
+  FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
   bool _isRecording = false;
-  String? _recordedFilePath;
+  bool _isPlaying = false;
+  String _filePath = '';
+
+
+///
+
+Future<void> _initialize() async {
+    await _recorder.openRecorder();
+    await _player.openPlayer();
+
+    if (await Permission.microphone.request().isGranted) {
+      // Permiso concedido
+    } else {
+      // Permiso denegado
+    }
+
+    Directory tempDir = await getTemporaryDirectory();
+    _filePath = '${tempDir.path}/audio_record.aac';
+  }
+
 
   @override
   void initState() {
     super.initState();
+    _initialize();//inciializar grabador de audio
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
     });
@@ -54,8 +85,6 @@ class _ChatScreenState extends State<ChatScreen> {
     fetchMessages();
 
 
-// Inicializar el grabador de sonido
-   
 
   }
 
@@ -63,6 +92,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    // Cerrar el grabador y reproductor de audio
+    _recorder.closeRecorder();
+    _player.closePlayer();
+
     socket.off('receiveMessage', _handleReceivedMessage);
     socket.disconnect();
     messageController.dispose();
@@ -72,11 +105,43 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
 //////////////////////// audio
-///
-// Método para grabar audio
-Future<void> _recordAudio() async {
+  Future<void> _startRecording() async {
+    await _recorder.startRecorder(toFile: _filePath);
+    setState(() {
+      _isRecording = true;
+    });
+  }
+
+  Future<void> _stopRecording() async {
+    await _recorder.stopRecorder();
+    setState(() {
+      _isRecording = false;
+    });
+    await _sendAudioMessage(_filePath);
+  }
+
+  Future<void> _startPlaying() async {
+    await _player.startPlayer(fromURI: _filePath, whenFinished: () {
+      setState(() {
+        _isPlaying = false;
+      });
+    });
+    setState(() {
+      _isPlaying = true;
+    });
+  }
+
+  Future<void> _stopPlaying() async {
+    await _player.stopPlayer();
+    setState(() {
+      _isPlaying = false;
+    });
+  }
+
   
-}
+
+////////////////////////
+
 
 
   // Método para enviar el mensaje de audio
@@ -98,6 +163,7 @@ Future<void> _recordAudio() async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse(url));
       request.files.add(await http.MultipartFile.fromPath('audio', filePath));
+      request.fields['FECHA'] = formattedDate;
 
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
@@ -336,17 +402,46 @@ Widget _buildMessage(Map<String, dynamic> message) {
           children: [
             if (isMedia)
               Image.network(
-                messageText,
+                '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
               ),
             if (isAudio)
-              IconButton(
-                icon: Icon(Icons.play_arrow),
-                onPressed: () {
-                  // Implementación para reproducir el audio
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.stop : Icons.play_arrow,
+                      color: isMe ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () async {
+                      if (_isPlaying) {
+                        await _stopPlaying();
+                      } else {
+                        await _player.startPlayer(
+                          fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                          whenFinished: () {
+                            setState(() {
+                              _isPlaying = false;
+                            });
+                          },
+                        );
+                        setState(() {
+                          _isPlaying = true;
+                        });
+                      }
+                    },
+                  ),
+                ],
               ),
             if (!isMedia && !isAudio)
               Text(
@@ -366,8 +461,8 @@ Widget _buildMessage(Map<String, dynamic> message) {
       ),
     );
   }
-  
-  Widget _buildDateSeparator(String date) {
+
+Widget _buildDateSeparator(String date) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Center(
@@ -479,24 +574,32 @@ Widget _buildMessage(Map<String, dynamic> message) {
                 ),
                 SizedBox(width: 8),
                 Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue,
-                  ),
-                  child: IconButton(
-                    icon: isTyping ? Icon(Icons.send) : Icon(Icons.mic),
-                    onPressed: () {
-                      String message = messageController.text.trim();
-                      if (message.isNotEmpty) {
-                        sendMessage(message);
-                      }
-                      else {
-                        _recordAudio();
-                      }
-                    },
-                    color: Colors.white,
-                  ),
-                ),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.blue,
+      ),
+      child: IconButton(
+        icon: _isRecording ? Icon(Icons.stop) : (isTyping ? Icon(Icons.send) : Icon(Icons.mic)),
+        onPressed: () {
+          if (isTyping) {
+            String message = messageController.text.trim();
+            if (message.isNotEmpty) {
+              sendMessage(message);
+            }
+          } else {
+            if (_isRecording) {
+              _stopRecording();
+            } else {
+              _startRecording();
+            }
+          }
+        },
+        color: Colors.white,
+      ),
+    ),
+                // Botón para grabar audio
+                
+          
               ],
             ),
           ),

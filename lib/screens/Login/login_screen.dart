@@ -38,7 +38,8 @@ class _LoginScreenState extends State<LoginScreen> {
       loginAttempts++;
     });
     await prefs.setInt('loginAttempts', loginAttempts);
-    await prefs.setInt('lastAttemptTime', DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+        'lastAttemptTime', DateTime.now().millisecondsSinceEpoch);
   }
 
   Future<void> _resetLoginAttempts() async {
@@ -104,21 +105,29 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         MaterialPageRoute(builder: (context) => MenuScreen()),
       );
-    } else {
+    }
+ if (response.statusCode == 403) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Usuario inactivo'),
+      duration: Duration(seconds: 3), // Duración del snackbar
+      backgroundColor: Colors.red, // Color de fondo del snackbar
+    ),
+  );
+}
+
+     else {
       // Incrementar los intentos fallidos
       await _incrementLoginAttempts();
       if (loginAttempts >= maxAttempts) {
-        _showErrorSnackBar('Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
+        _showErrorSnackBar(
+            'Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
         // Aquí puedes agregar la lógica adicional para bloquear la app
       } else {
         if (response.statusCode == 401) {
-          _showErrorSnackBar('Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
-        } else {
-          // Error en el inicio de sesión
-          print('Error en el inicio de sesión: ${response.statusCode}');
-          // Muestra un mensaje de error
-          _showErrorSnackBar('Error en el inicio de sesión: ${response.statusCode}');
-        }
+          _showErrorSnackBar(
+              'Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
+        } 
       }
     }
   }
@@ -140,7 +149,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await _loginUser(phoneController.text, passwordController.text);
       } else {
         // Mostrar un mensaje indicando que el usuario debe mantener la sesión iniciada
-        _showErrorSnackBar('Debes mantener la sesión iniciada para iniciar sesión.');
+        _showErrorSnackBar(
+            'Debes mantener la sesión iniciada para iniciar sesión.');
       }
     }
   }
@@ -256,7 +266,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           // Botón de inicio de sesión
                           Container(
-                            margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            margin: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
                             width: double.infinity,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
@@ -328,7 +339,8 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(11.0),
               borderSide: BorderSide(color: Color(0xFF0B416C)),
             ),
-            contentPadding: EdgeInsets.symmetric(vertical: 14.0, horizontal: 14.0),
+            contentPadding:
+                EdgeInsets.symmetric(vertical: 14.0, horizontal: 14.0),
           ),
         ),
       ],
