@@ -31,7 +31,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   device_info_plus: ^9.0.0 # Biblioteca para obtener información del dispositivo
-  http: ^1.0.0 # Versión compatible de la biblioteca HTTP
+  http: ^0.13.4
   geolocator: ^7.6.2
   flutter_webview_plugin: ^0.4.0
   shared_preferences: ^2.0.8

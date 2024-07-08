@@ -1,8 +1,8 @@
 class ConfigBackend {
   //static String _backendUrl = 'https://9160-2806-103e-30-f054-aeae-a6b6-7cb9-8ae0.ngrok-free.app';
   //static String _backendUrl = 'http://192.168.1.76:3000'; -- desktop
-  static String _backendUrl = 'http://192.168.1.90:3000'; // -- laptop casa
-  //static String _backendUrl = 'http://192.168.100.123:3000'; // -- laptop escuela
+  //static String _backendUrl = 'http://192.168.1.90:3000'; // -- laptop casa
+  static String _backendUrl = 'https://segubackend.com:3000'; // -- laptop escuela
   // static String _backendUrl = 'http://20.102.109.114:3000';
 //https://9160-2806-103e-30-f054-aeae-a6b6-7cb9-8ae0.ngrok-free.app 
   static String get backendUrl => _backendUrl;
