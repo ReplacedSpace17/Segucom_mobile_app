@@ -203,7 +203,7 @@ class _MenuScreenState extends State<MenuScreen> {
           context,
           MaterialPageRoute(
               builder: (context) => WebViewScreen(
-                  url: 'https://segucom.mx/help/', title: 'Menu de ayuda')),
+                  url: 'https://segucom.mx/help/videos/mobile/', title: 'Menu de ayuda')),
         );
         break;
     }

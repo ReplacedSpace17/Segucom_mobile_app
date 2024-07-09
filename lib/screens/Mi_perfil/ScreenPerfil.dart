@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
+import 'package:segucom_app/screens/Home/Options/Option1.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
@@ -162,7 +163,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
         );
         break;
       case 3:
-        // Navegar a la pantalla de ajustes si es necesario
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => WebViewScreen(
+                  url: 'https://segucom.mx/help/videos/mobile/', title: 'Menu de ayuda')),
+        );
         break;
     }
   }
