@@ -55,8 +55,15 @@ dependencies:
   vibration: ^1.7.5
 
 ##segundo plano y btn de panico
-  
+  volume_watcher: ^2.0.1
+  flutter_background_service: ^5.0.6
 
+#notificaciones
+  flutter_local_notifications: ^9.1.6
+
+  palette_generator: ^0.3.3+3
+
+  awesome_notifications: ^0.7.4+1
 
 dev_dependencies:
   flutter_test:

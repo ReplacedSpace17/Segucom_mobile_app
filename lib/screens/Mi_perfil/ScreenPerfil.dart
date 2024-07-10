@@ -239,6 +239,19 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         child: Text('Cambiar Contraseña'),
                       ),
                     ),
+                    SizedBox(height: 10), // Espacio adicional entre las cards y el botón
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => LoginScreen()),
+                          );
+                        },
+                        child: Text('Cerrar Sesión'),
+                      ),
+                    ),
                   ],
                 ),
               ),

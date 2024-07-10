@@ -53,7 +53,7 @@ android {
 
     defaultConfig {
         applicationId "com.segucom.segucom_app"
-        minSdkVersion 31
+        minSdkVersion 30
         targetSdkVersion 34
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:segucom_app/screens/Pase_lista/Screen_Pase_Lista.dart';
+import 'package:volume_watcher/volume_watcher.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
@@ -14,6 +16,8 @@ import '../Message/ScreenListChats.dart';
 import '../Mi_perfil/ScreenPerfil.dart';
 
 class MenuScreen extends StatefulWidget {
+  const MenuScreen({Key? key}) : super(key: key);
+
   @override
   _MenuScreenState createState() => _MenuScreenState();
 }
@@ -33,6 +37,12 @@ class _MenuScreenState extends State<MenuScreen> {
   int _numConsignas = 0;
   int _numBoletines = 0;
 
+  // Variables para el botón de pánico
+  int buttonPressCount = 0;
+  bool alertShowing =
+      false; // Estado para controlar si la alerta está siendo mostrada
+  final int requiredPressCount = 15;
+
   @override
   void initState() {
     super.initState();
@@ -45,32 +55,43 @@ class _MenuScreenState extends State<MenuScreen> {
     //obtener notificaciones
     //obtener notificaciones
     _getNotifications();
-    
+
+    // Iniciar el listener para cambios en el volumen
+
+    VolumeWatcher.setVolume(1.0); // 1.0 representa el 100% de volumen
+    // Configurar el listener para cambios en el volumen
+    VolumeWatcher.addListener(_onVolumeChanged);
   }
 
   Future<void> _getNotifications() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     String Numero_elemento = prefs.getString('NumeroElemento') ?? '';
 
-   final url = Uri.parse(
-          ConfigBackend.backendUrl + '/segucom/api/user/boletines/' + Numero_elemento);
-     //imprimir a consola la url
-      print(url);
-      final response = await http.get(
-        url,
-        headers: {'Content-Type': 'application/json'});
-      if (response.statusCode == 200) {
-        //obtener el cuerpo de la respuesta
-        final body = jsonDecode(response.body);
-        print(body);
-        //set a numConsignas y numBoletines
-        setState(() {
-          _numConsignas = body['Consignas'];
-          _numBoletines = body['Boletines'];
-        });
-      } else {
-        print('Error al enviar ubicación: ${response.statusCode}');
-      }
+    final url = Uri.parse(ConfigBackend.backendUrl +
+        '/segucom/api/user/boletines/' +
+        Numero_elemento);
+    //imprimir a consola la url
+    print(url);
+    final response =
+        await http.get(url, headers: {'Content-Type': 'application/json'});
+    if (response.statusCode == 200) {
+      //obtener el cuerpo de la respuesta
+      final body = jsonDecode(response.body);
+      print(body);
+      //set a numConsignas y numBoletines
+      setState(() {
+        _numConsignas = body['Consignas'];
+        _numBoletines = body['Boletines'];
+      });
+      String mensaje = "Consignas: " +
+          _numConsignas.toString() +
+          " Boletines: " +
+          _numBoletines.toString();
+      NotificationController.createNewNotification(
+          "Tienes nuevas asignaciones", mensaje);
+    } else {
+      print('Error al enviar ubicación: ${response.statusCode}');
+    }
   }
 
   void _loadNombre() async {
@@ -85,7 +106,6 @@ class _MenuScreenState extends State<MenuScreen> {
     setState(() {
       _numElemento = prefs.getString('NumeroElemento') ?? '';
     });
-    
   }
 
   void _loadTelefono() async {
@@ -98,6 +118,8 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    VolumeWatcher.removeListener(_onVolumeChanged as int?);
+
     super.dispose();
   }
 
@@ -184,6 +206,7 @@ class _MenuScreenState extends State<MenuScreen> {
     switch (index) {
       case 0:
         // Navegar a la pantalla de inicio si es necesario
+
         break;
       case 1:
         Navigator.push(
@@ -203,7 +226,8 @@ class _MenuScreenState extends State<MenuScreen> {
           context,
           MaterialPageRoute(
               builder: (context) => WebViewScreen(
-                  url: 'https://segucom.mx/help/videos/mobile/', title: 'Menu de ayuda')),
+                  url: 'https://segucom.mx/help/videos/mobile/',
+                  title: 'Menu de ayuda')),
         );
         break;
     }
@@ -557,5 +581,64 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       );
     }
+  }
+
+  /////////////////////////////////////////////////////////////////////////////// boton de panico
+  void _onVolumeChanged(double volume) {
+    print("Current Volume: $volume");
+    // Verificar si la alerta está siendo mostrada
+    if (!alertShowing) {
+      // Verificar que el volumen esté disminuyendo (botón de bajar volumen)
+      if (volume < 1.0) {
+        // volume es un valor entre 0 y 1, donde 1 es volumen máximo
+        setState(() {
+          buttonPressCount++;
+          // Verificar si se ha alcanzado el número requerido de pulsaciones
+          if (buttonPressCount >= requiredPressCount) {
+            _showPanicAlert();
+            // Desactivar el conteo hasta que se cierre la alerta
+            buttonPressCount = 0;
+            alertShowing = true;
+          }
+        });
+      }
+    }
+  }
+
+  void _showPanicAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Impide cerrar la alerta haciendo clic afuera
+      builder: (context) => AlertDialog(
+        title: Text('Estás activando el botón de pánico'),
+        content: Text('¿Deseas enviar una alerta?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              VolumeWatcher.setVolume(1.0);
+              Navigator.pop(context);
+              setState(() {
+                alertShowing = false; // Habilitar el conteo nuevamente
+              });
+              // Acción para "Sí"
+              // Aquí puedes agregar el código para enviar la alerta
+            },
+            child: Text('Sí'),
+          ),
+          TextButton(
+            onPressed: () {
+              VolumeWatcher.setVolume(1.0);
+              Navigator.pop(context);
+              setState(() {
+                alertShowing = false; // Habilitar el conteo nuevamente
+              });
+              // Acción para "No"
+              // Aquí puedes agregar el código si es necesario
+            },
+            child: Text('No'),
+          ),
+        ],
+      ),
+    );
   }
 }

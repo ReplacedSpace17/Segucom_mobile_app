@@ -61,78 +61,78 @@ class _LoginScreenState extends State<LoginScreen> {
     return currentTime - lastAttemptTime < lockoutDuration * 1000;
   }
 
-  Future<void> _loginUser(String phone, String password) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/login');
-    print('URL: $url');
-    final response = await http.post(
-      url,
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode({
-        "telefono": phone,
-        "clave": password,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      // Parsear la respuesta JSON
-      final Map<String, dynamic> userData = jsonDecode(response.body);
-      print('Datos del usuario: $userData');
-      // Guardar los datos del usuario
-
-      final String nombre = userData['PERFIL_NOMBRE'];
-      final int telefono = userData['ELEMENTO_TELNUMERO'];
-      final String elementoNum = userData['ELEMENTO_NUMERO'].toString();
-
-      prefs.setInt('NumeroTel', telefono);
-      prefs.setString('Name', nombre);
-      prefs.setString('NumeroElemento', elementoNum);
-      // Inicio de sesión exitoso
-      print('Inicio de sesión exitoso');
-      print(nombre);
-
-      // Resetear los intentos fallidos
-      await _resetLoginAttempts();
-
-      // Limpiar los campos de texto
-      phoneController.clear();
-      passwordController.clear();
-
-      // Navegar al menú y pasar los datos del usuario como argumentos
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => MenuScreen()),
-      );
-    }
- if (response.statusCode == 403) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('Usuario inactivo'),
-      duration: Duration(seconds: 3), // Duración del snackbar
-      backgroundColor: Colors.red, // Color de fondo del snackbar
-    ),
+ Future<void> _loginUser(String phone, String password) async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/login');
+  print('URL: $url');
+  final response = await http.post(
+    url,
+    headers: <String, String>{
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: jsonEncode({
+      "telefono": phone,
+      "clave": password,
+    }),
   );
-}
 
-     else {
-      // Incrementar los intentos fallidos
-      await _incrementLoginAttempts();
-      if (loginAttempts >= maxAttempts) {
+  if (response.statusCode == 200) {
+    // Parsear la respuesta JSON
+    final Map<String, dynamic> userData = jsonDecode(response.body);
+    print('Datos del usuario: $userData');
+
+    // Guardar el token de autenticación
+    final String token = userData['token'];
+    prefs.setString('authToken', token);
+
+    // Guardar otros datos del usuario si es necesario
+    final String nombre = userData['PERFIL_NOMBRE'];
+    final int telefono = userData['ELEMENTO_TELNUMERO'];
+    final String elementoNum = userData['ELEMENTO_NUMERO'].toString();
+    prefs.setInt('NumeroTel', telefono);
+    prefs.setString('Name', nombre);
+    prefs.setString('NumeroElemento', elementoNum);
+
+    // Inicio de sesión exitoso
+    print('Inicio de sesión exitoso');
+    print(nombre);
+
+    // Resetear los intentos fallidos
+    await _resetLoginAttempts();
+
+    // Limpiar los campos de texto
+    phoneController.clear();
+    passwordController.clear();
+
+    // Navegar al menú y pasar los datos del usuario como argumentos
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => MenuScreen()),
+    );
+  } else if (response.statusCode == 403) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Usuario inactivo'),
+        duration: Duration(seconds: 3), // Duración del snackbar
+        backgroundColor: Colors.red, // Color de fondo del snackbar
+      ),
+    );
+  } else {
+    // Incrementar los intentos fallidos
+    await _incrementLoginAttempts();
+    if (loginAttempts >= maxAttempts) {
+      _showErrorSnackBar(
+          'Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
+      // Aquí puedes agregar la lógica adicional para bloquear la app
+    } else {
+      if (response.statusCode == 401) {
         _showErrorSnackBar(
-            'Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
-        // Aquí puedes agregar la lógica adicional para bloquear la app
-      } else {
-        if (response.statusCode == 401) {
-          _showErrorSnackBar(
-              'Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
-        } 
+            'Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
       }
     }
   }
-
-  void _showErrorSnackBar(String message) {
+}
+void _showErrorSnackBar(String message) {
     final snackBar = SnackBar(
       content: Text(message),
       backgroundColor: Colors.red,

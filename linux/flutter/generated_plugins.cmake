@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_linux
+  awesome_notifications
   file_selector_linux
   flutter_webrtc
   record_linux

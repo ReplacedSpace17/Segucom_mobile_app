@@ -276,30 +276,62 @@ Container(
   }
 
   Future<void> _cerrarPaseDeLista() async {
-    final prefs = await SharedPreferences.getInstance();
-    int grupoID = prefs.getInt('grupoID') ?? 1;
-    int idEncabezado = prefs.getInt('ID_Encabezado') ?? 1;
-
-    for (int numeroElemento in elementosPresentes) {
-      try {
-        final url = Uri.parse(
-            ConfigBackend.backendUrl + '/segucom/api/pase_de_lista/validar_elemento/$numeroElemento/$grupoID/$idEncabezado');
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          // Lógica adicional si se requiere manejar la respuesta del backend
-        } else {
-          throw Exception('Error al validar elemento: ${response.statusCode}');
-        }
-      } catch (e) {
-        _mostrarAlerta(context, "Error al validar elemento: $e");
-      }
-    }
-
-    // Navegar a la pantalla MenuScreen después de cerrar el pase de lista
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => MenuScreen()),
+  if (elementos.isNotEmpty) {
+    bool confirmarCierre = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirmar cierre'),
+          content: Text('Aún hay elementos que no han sido escaneados. ¿Está seguro de cerrar el pase de lista?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop(false); // Devuelve false para cancelar
+              },
+            ),
+            TextButton(
+              child: Text('Aceptar'),
+              onPressed: () {
+                Navigator.of(context).pop(true); // Devuelve true para confirmar
+              },
+            ),
+          ],
+        );
+      },
     );
+
+    if (!confirmarCierre) {
+      return; // Si el usuario cancela, no se cierra el pase de lista
+    }
   }
+
+  final prefs = await SharedPreferences.getInstance();
+  int grupoID = prefs.getInt('grupoID') ?? 1;
+  int idEncabezado = prefs.getInt('ID_Encabezado') ?? 1;
+
+  for (int numeroElemento in elementosPresentes) {
+    try {
+      final url = Uri.parse(
+          ConfigBackend.backendUrl + '/segucom/api/pase_de_lista/validar_elemento/$numeroElemento/$grupoID/$idEncabezado');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // Lógica adicional si se requiere manejar la respuesta del backend
+      } else {
+        throw Exception('Error al validar elemento: ${response.statusCode}');
+      }
+    } catch (e) {
+      _mostrarAlerta(context, "Error al validar elemento: $e");
+    }
+  }
+
+  // Navegar a la pantalla MenuScreen después de cerrar el pase de lista
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(builder: (context) => MenuScreen()),
+  );
+}
+
+
 
 
     Widget _buildCardInformation(String title, String value, String pathIcon) {

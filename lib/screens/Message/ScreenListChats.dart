@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:segucom_app/screens/Message/ChatGruoup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../configBackend.dart';
 import './Chat.dart'; // Importar la pantalla ChatScreen
@@ -30,6 +31,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   late Future<List<dynamic>> futureChats;
+  late Future<List<dynamic>> futureChatsGroups;
   String _numElemento = '';
 
   @override
@@ -38,6 +40,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _loadNumElemento().then((_) {
       setState(() {
         futureChats = fetchChats();
+         futureChatsGroups = fetchChatsGroups();
       });
     });
   }
@@ -72,73 +75,168 @@ class _ChatListScreenState extends State<ChatListScreen> {
       throw Exception('Failed to load chats');
     }
   }
+Future<List<dynamic>> fetchChatsGroups() async {
+  if (_numElemento.isEmpty) {
+    throw Exception('Número de elemento no cargado');
+  }
 
-  @override
+  final response = await http.get(Uri.parse(
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroup/$_numElemento'));
+
+  if (response.statusCode == 200) {
+    List<dynamic> data = json.decode(response.body);
+
+    data.forEach((chat) {
+      print('ELEMENTO_NUM: ${chat['ELEMENTO_NUM']}');
+      print('GRUPO_DESCRIP: ${chat['GRUPO_DESCRIP']}');
+      print('ULTIMO_MENSAJE: ${chat['MENSAJES'].isNotEmpty ? chat['MENSAJES'].last['MENSAJE'] : 'No hay mensajes'}');
+      // Agregar 'ID_GRUPO
+      print('ID_GRUPO: ${chat['GRUPO_ID']}');
+    });
+
+    return data
+        .map((chat) => {
+              'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
+              'NOMBRE_COMPLETO': chat['GRUPO_DESCRIP'],
+              'GRUPO_ID': chat['GRUPO_ID'], // Agregar 'ID_GRUPO
+              'ULTIMO_MENSAJE': chat['MENSAJES'].isNotEmpty
+                  ? chat['MENSAJES'].last['MENSAJE']
+                  : 'No hay mensajes'
+            })
+        .toList();
+  } else {
+    throw Exception('Failed to load group chats');
+  }
+}
+
+  Future<void> _refreshChats() async {
+    setState(() {
+      futureChats = fetchChats();
+      futureChatsGroups = fetchChatsGroups();
+      
+    });
+    
+  }
+
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Chats'),
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: futureChats,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No hay chats disponibles'));
-          } else {
-            return ListView.builder(
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                var chat = snapshot.data![index];
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Image.asset(
-                        'lib/assets/icons/contact.png',
-                        width: 48,
-                        height: 48,
-                      ),
-                      title: Text(
-                        '${chat['NOMBRE_COMPLETO']}',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text('${chat['ULTIMO_MENSAJE']}'),
-                      onTap: () async {
-                        // Navegar a ChatScreen y esperar resultado
-                        var result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(
-                              chatData: chat,
-                              numElemento: _numElemento, // Pasar _numElemento
-                            ),
-                          ),
-                        );
+      body: RefreshIndicator(
+        onRefresh: _refreshChats,
+        child: FutureBuilder<List<dynamic>>(
+          future: Future.wait([futureChats, futureChatsGroups]),
+          builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            } else if (!snapshot.hasData ||
+                snapshot.data!.isEmpty ||
+                snapshot.data!.first.isEmpty) {
+              return Center(child: Text('No hay chats disponibles'));
+            } else {
+              List<dynamic> chats = snapshot.data![0];
+              List<dynamic> chatsGroups = snapshot.data![1];
 
-                        // Verificar si se envió un mensaje desde ChatScreen
-                        if (result != null && result is bool && result) {
-                          // Actualizar la lista de chats si se envió un mensaje
-                          setState(() {
-                            futureChats = fetchChats();
-                          });
-                        }
-                      },
-                    ),
-                    Divider(
-                      color: Colors.grey,
-                      thickness: 1.0,
-                      indent: 16.0,
-                      endIndent: 16.0,
-                    ),
-                  ],
-                );
-              },
-            );
-          }
-        },
+              return ListView.builder(
+                itemCount: chats.length + chatsGroups.length,
+                itemBuilder: (context, index) {
+                  if (index < chats.length) {
+                    var chat = chats[index];
+                    return Column(
+                      children: [
+                        ListTile(
+                          leading: Image.asset(
+                            'lib/assets/icons/contact.png',
+                            width: 48,
+                            height: 48,
+                          ),
+                          title: Text(
+                            '${chat['NOMBRE_COMPLETO']}',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text('${chat['ULTIMO_MENSAJE']}'),
+                          onTap: () async {
+                            // Navegar a ChatScreen y esperar resultado
+                            var result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  chatData: chat,
+                                  numElemento: _numElemento,
+                                ),
+                              ),
+                            );
+
+                            // Actualizar la lista de chats si se envió un mensaje
+                            if (result != null && result is bool && result) {
+                              setState(() {
+                                futureChats = fetchChats();
+                              });
+                            }
+                          },
+                        ),
+                        Divider(
+                          color: Colors.grey,
+                          thickness: 1.0,
+                          indent: 16.0,
+                          endIndent: 16.0,
+                        ),
+                      ],
+                    );
+                  } else {
+                    var chatGroup = chatsGroups[index - chats.length];
+                    return Column(
+                      children: [
+                        ListTile(
+                          leading: Image.asset(
+                            'lib/assets/icons/contact.png',
+                            width: 48,
+                            height: 48,
+                          ),
+                          title: Text(
+                            '${chatGroup['NOMBRE_COMPLETO']}',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
+                          onTap: () async {
+                            // Navegar a ChatScreen y esperar resultado
+                            var result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreenGroup(
+                                  chatData: chatGroup,
+                                  numElemento: _numElemento,
+                                  idGrupo: chatGroup['GRUPO_ID'].toString(),
+                                ),
+                              ),
+                            );
+
+                            // Actualizar la lista de chats si se envió un mensaje
+                            if (result != null && result is bool && result) {
+                              setState(() {
+                                futureChatsGroups = fetchChatsGroups();
+                              });
+                            }
+                          },
+                        ),
+                        Divider(
+                          color: Colors.grey,
+                          thickness: 1.0,
+                          indent: 16.0,
+                          endIndent: 16.0,
+                        ),
+                      ],
+                    );
+                  }
+                },
+              );
+            }
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -152,5 +250,4 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: Icon(Icons.add),
       ),
     );
-  }
-}
+  }}

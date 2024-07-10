@@ -11,7 +11,8 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final TextEditingController employeeNumberController = TextEditingController();
+  final TextEditingController employeeNumberController =
+      TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -43,7 +44,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       },
       body: jsonEncode(user),
     );
-
+    print(url);
     if (response.statusCode == 200) {
       // Registro exitoso
       print('Usuario registrado correctamente');
@@ -69,7 +70,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final double screenHeight = MediaQuery.of(context).size.height;
     return Scaffold(
-      resizeToAvoidBottomInset: true, // Importante para evitar problemas de teclado
+      resizeToAvoidBottomInset:
+          true, // Importante para evitar problemas de teclado
       body: Stack(
         children: <Widget>[
           // Imagen de fondo
@@ -105,8 +107,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: Colors.white,
                     child: SingleChildScrollView(
                       padding: EdgeInsets.all(16.0),
-                      child: Padding( // Agrega Padding para ajustar el ancho
-                        padding: EdgeInsets.symmetric(horizontal: 20.0), // Ajusta este valor según sea necesario
+                      child: Padding(
+                        // Agrega Padding para ajustar el ancho
+                        padding: EdgeInsets.symmetric(
+                            horizontal:
+                                20.0), // Ajusta este valor según sea necesario
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
@@ -204,11 +209,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             // Botón de registro
                             Container(
-                              margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              margin: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 10),
                               width: double.infinity,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF073560), // Color de fondo
+                                  backgroundColor:
+                                      Color(0xFF073560), // Color de fondo
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12.0),
                                   ),
@@ -217,7 +224,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 onPressed: acceptTerms
                                     ? () {
                                         var user = {
-                                          "No_Empleado": int.tryParse(employeeNumberController.text) ?? 0,
+                                          "No_Empleado": int.tryParse(
+                                                  employeeNumberController
+                                                      .text) ??
+                                              0,
                                           "Nombre": nameController.text,
                                           "Telefono": phoneController.text,
                                           "IMEI": imei,
@@ -280,7 +290,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             filled: true,
             fillColor: Color.fromARGB(255, 243, 243, 243),
             prefixIcon: Icon(icon, color: Color(0xFF616161)),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0), // Padding personalizado
+            contentPadding: EdgeInsets.symmetric(
+                horizontal: 16.0, vertical: 14.0), // Padding personalizado
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(11.0),
               borderSide: BorderSide(color: Color(0xFFD8D8D8)),

@@ -13,19 +13,23 @@ import '../../configBackend.dart';
 
 import 'package:flutter_sound/flutter_sound.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreenGroup extends StatefulWidget {
   //audio
 
   final Map<String, dynamic> chatData;
   final String numElemento;
+  final String idGrupo;
 
-  ChatScreen({required this.chatData, required this.numElemento});
+  ChatScreenGroup(
+      {required this.chatData,
+      required this.numElemento,
+      required this.idGrupo});
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  _ChatScreenGroupState createState() => _ChatScreenGroupState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenGroupState extends State<ChatScreenGroup> {
   List<dynamic> messages = [];
   TextEditingController messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -140,7 +144,7 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/audio/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/audio/groups/${widget.numElemento}/${widget.idGrupo}';
 
     try {
       var request = http.MultipartRequest('POST', Uri.parse(url));
@@ -153,7 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.statusCode == 200) {
         var responseData = json.decode(response.body);
         var audioUrl = responseData['audioUrl'];
-       
+        
         var newMessage = {
           'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
           'FECHA': formattedDate,
@@ -174,40 +178,48 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> fetchMessages() async {
     try {
       final response = await http.get(Uri.parse(
-          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}'));
+          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroup/groupid/${widget.idGrupo}'));
 
       if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
+        Map<String, dynamic> data = json.decode(response.body);
 
-        if (data.isNotEmpty) {
-          List<dynamic> mensajes = data[0]['MENSAJES'];
-          if (mounted) {
-            setState(() {
-              messages = mensajes.map((message) {
-                // Convertir URL de imagen a absoluta si es una imagen
-                if (message['MEDIA'] == 'IMAGE') {
-                  message['MENSAJE'] =
-                      '${ConfigBackend.backendUrlComunication}${message['UBICACION']}';
-                }
-                return {
-                  'MENSAJE_ID': message['MENSAJE_ID'],
-                  'FECHA': message['FECHA'],
-                  'REMITENTE': message['REMITENTE'],
-                  'MENSAJE': message['MENSAJE'],
-                  'MEDIA': message['MEDIA'],
-                  'UBICACION': message['UBICACION'],
-                };
-              }).toList();
-            });
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _scrollToBottom());
+        if (data.containsKey('MENSAJES')) {
+          List<dynamic> mensajes = data['MENSAJES'];
+          if (mensajes.isNotEmpty) {
+            print(mensajes); // Imprime los mensajes obtenidos
+
+            if (mounted) {
+              setState(() {
+                messages = mensajes.map((message) {
+                  // Convertir URL de imagen a absoluta si es una imagen
+                  if (message['MEDIA'] == 'IMAGE') {
+                    message['MENSAJE'] =
+                        '${ConfigBackend.backendUrlComunication}${message['UBICACION']}';
+                  }
+                  return {
+                    'MENSAJE_ID': message['MENSAJE_ID'],
+                    'FECHA': message['FECHA'],
+                    'REMITENTE': message['REMITENTE'],
+                    'MENSAJE': message['MENSAJE'],
+                    'MEDIA': message['MEDIA'],
+                    'UBICACION': message['UBICACION'],
+                    'ELEMENTO_NUMERO': message['ELEMENTO_NUMERO'],
+                    'NOMBRE': message['NOMBRE']
+                  };
+                }).toList();
+              });
+              WidgetsBinding.instance
+                  .addPostFrameCallback((_) => _scrollToBottom());
+            }
+          } else {
+            if (mounted) {
+              setState(() {
+                messages = [];
+              });
+            }
           }
         } else {
-          if (mounted) {
-            setState(() {
-              messages = [];
-            });
-          }
+          throw Exception('Field MENSAJES not found in response');
         }
       } else {
         throw Exception('Failed to load messages');
@@ -250,14 +262,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
     var requestBody = {
       "FECHA": formattedDate,
-      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "RECEPTOR": widget.idGrupo,
       "MENSAJE": message,
       "MEDIA": "TXT",
-      "UBICACION": "NA"
+      "UBICACION": "NA",
+      "GRUPO_ID": widget.idGrupo
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/group/${widget.numElemento}';
 
     try {
       final response = await http.post(
@@ -291,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     var requestBody = {
       "FECHA": formattedDate,
-      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "RECEPTOR": widget.idGrupo,
       "MENSAJE": '',
       "MEDIA": filePath,
       "TIPO_MEDIA": fileType,
@@ -299,7 +312,7 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/group/image/${widget.numElemento}/${widget.idGrupo}';
 
     try {
       // Convertir el requestBody a formato JSON
@@ -330,6 +343,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'MENSAJE':
               '', // Asegúrate de convertir imageUrl a String si es necesario
           'MEDIA': 'IMAGE',
+          'NOMBRE': 'XSX',
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
         };
@@ -358,10 +372,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessage(Map<String, dynamic> message) {
+
+    
+    if (message == null) {
+      return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
+    }
+
     bool isMe = message['REMITENTE'].toString() == widget.numElemento;
     bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
     bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
-    String messageText = message['MENSAJE'];
+    String messageText =
+        message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
+    String remitente = message['NOMBRE'] ?? '';
+    String fecha = message['FECHA'] ?? '';
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -388,7 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             if (isMedia)
               Image.network(
-                '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
@@ -413,9 +436,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (_isPlaying) {
                         await _stopPlaying();
                       } else {
+                        
                         await _player.startPlayer(
                           fromURI:
-                              '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                              '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
                           whenFinished: () {
                             setState(() {
                               _isPlaying = false;
@@ -425,7 +449,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         setState(() {
                           _isPlaying = true;
                         });
-                      }
+                        
+                        print(
+                            'REPRODUCIENDO DEEE:  ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
+                    }
                     },
                   ),
                 ],
@@ -437,11 +464,23 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             SizedBox(height: 4),
             Text(
-              DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
+              fecha.isNotEmpty
+                  ? DateFormat('HH:mm').format(DateTime.parse(fecha))
+                  : '',
               style: TextStyle(
                   color: isMe ? Colors.white70 : Colors.black54,
                   fontSize: 11,
                   fontWeight: FontWeight.w400),
+            ),
+            SizedBox(
+                height: 2), // Espacio entre el texto del mensaje y el remitente
+            Text(
+              remitente,
+              style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.black54,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -478,16 +517,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.phone),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.videocam),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
