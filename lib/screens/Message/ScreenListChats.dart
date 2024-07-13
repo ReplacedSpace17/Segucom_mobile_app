@@ -40,7 +40,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _loadNumElemento().then((_) {
       setState(() {
         futureChats = fetchChats();
-         futureChatsGroups = fetchChatsGroups();
+        futureChatsGroups = fetchChatsGroups();
       });
     });
   }
@@ -75,50 +75,50 @@ class _ChatListScreenState extends State<ChatListScreen> {
       throw Exception('Failed to load chats');
     }
   }
-Future<List<dynamic>> fetchChatsGroups() async {
-  if (_numElemento.isEmpty) {
-    throw Exception('Número de elemento no cargado');
+
+  Future<List<dynamic>> fetchChatsGroups() async {
+    if (_numElemento.isEmpty) {
+      throw Exception('Número de elemento no cargado');
+    }
+
+    final response = await http.get(Uri.parse(
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroup/$_numElemento'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      print(data);
+      data.forEach((chat) {
+        print('ELEMENTO_NUM: ${chat['ELEMENTO_NUM']}');
+        print('GRUPO_DESCRIP: ${chat['GRUPO_DESCRIP']}');
+        print(
+            'ULTIMO_MENSAJE: ${chat['MENSAJES'].isNotEmpty ? chat['MENSAJES'].last['MENSAJE'] : 'No hay mensajes'}');
+        // Agregar 'ID_GRUPO
+        print('ID_GRUPO: ${chat['GRUPO_ID']}');
+      });
+
+      return data
+          .map((chat) => {
+                'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
+                'NOMBRE_COMPLETO': chat['GRUPO_DESCRIP'],
+                'GRUPO_ID': chat['GRUPO_ID'], // Agregar 'ID_GRUPO
+                'ULTIMO_MENSAJE': chat['MENSAJES'].isNotEmpty
+                    ? chat['MENSAJES'].last['MENSAJE']
+                    : 'No hay mensajes'
+              })
+          .toList();
+    } else {
+      throw Exception('Failed to load group chats');
+    }
   }
-
-  final response = await http.get(Uri.parse(
-      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroup/$_numElemento'));
-
-  if (response.statusCode == 200) {
-    List<dynamic> data = json.decode(response.body);
-
-    data.forEach((chat) {
-      print('ELEMENTO_NUM: ${chat['ELEMENTO_NUM']}');
-      print('GRUPO_DESCRIP: ${chat['GRUPO_DESCRIP']}');
-      print('ULTIMO_MENSAJE: ${chat['MENSAJES'].isNotEmpty ? chat['MENSAJES'].last['MENSAJE'] : 'No hay mensajes'}');
-      // Agregar 'ID_GRUPO
-      print('ID_GRUPO: ${chat['GRUPO_ID']}');
-    });
-
-    return data
-        .map((chat) => {
-              'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
-              'NOMBRE_COMPLETO': chat['GRUPO_DESCRIP'],
-              'GRUPO_ID': chat['GRUPO_ID'], // Agregar 'ID_GRUPO
-              'ULTIMO_MENSAJE': chat['MENSAJES'].isNotEmpty
-                  ? chat['MENSAJES'].last['MENSAJE']
-                  : 'No hay mensajes'
-            })
-        .toList();
-  } else {
-    throw Exception('Failed to load group chats');
-  }
-}
 
   Future<void> _refreshChats() async {
     setState(() {
       futureChats = fetchChats();
       futureChatsGroups = fetchChatsGroups();
-      
     });
-    
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -250,4 +250,5 @@ Future<List<dynamic>> fetchChatsGroups() async {
         child: Icon(Icons.add),
       ),
     );
-  }}
+  }
+}

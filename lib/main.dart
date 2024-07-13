@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:segucom_app/Services_background/UbicationService.dart';
 import 'package:segucom_app/configBackend.dart';
+import 'package:segucom_app/screens/App.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,6 +73,7 @@ class _SegucomAppState extends State<SegucomApp> {
         '/login': (context) => LoginScreen(),
         '/configBackend': (context) => ConfigScreen(),
         '/register': (context) => RegisterScreen(),
+        '/config':(context) => HomeScreen(),
         '/menu': (context) => MenuScreen(),
         '/notification-page': (context) => NotificationPage(
             receivedAction: NotificationController.initialAction!),
@@ -118,16 +120,16 @@ class _SplashScreenState extends State<SplashScreen> {
           Navigator.pushReplacementNamed(context, '/menu');
         } else {
           // Si el token es inválido o ha expirado, muestra la pantalla de inicio de sesión
-          Navigator.pushReplacementNamed(context, '/login');
+          Navigator.pushReplacementNamed(context, '/config');
         }
       } catch (e) {
         print('Error en la solicitud HTTP:' + e.toString());
         // Manejar errores de conexión u otros errores aquí
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushReplacementNamed(context, '/config');
       }
     } else {
       // No hay token guardado, navegar a la pantalla de inicio de sesión
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pushReplacementNamed(context, '/config');
     }
   }
 
@@ -245,7 +247,7 @@ void onStart(ServiceInstance service) async {
   if (authToken != null) {
     // Obtener el número de teléfono y el número de elemento del usuario
     
-     Timer.periodic(const Duration(seconds: 10), (timer) async {
+     Timer.periodic(const Duration(minutes: 10), (timer) async {
           if (service is AndroidServiceInstance) {
             if (await service.isForegroundService()) {
               _ubicationService.sendLocation("", _tel, _numElemento);

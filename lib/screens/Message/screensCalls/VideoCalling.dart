@@ -79,10 +79,7 @@ class _ScreenCallingState extends State<ScreenCalling> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.callerName,
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
+                        
                         Text(
                           widget.callerNumber,
                           style: TextStyle(fontSize: 16, color: Colors.white),

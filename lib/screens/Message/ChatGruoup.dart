@@ -36,6 +36,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   late IO.Socket socket;
   final ImagePicker _picker = ImagePicker();
   bool isTyping = false;
+  String NombreRemitente = '';
 
 // Variables para la grabación de audio
   FlutterSoundRecorder _recorder = FlutterSoundRecorder();
@@ -64,6 +65,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   @override
   void initState() {
     super.initState();
+    getNameRemitenteGroupChat(widget.numElemento);
     _initialize(); //inciializar grabador de audio
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
@@ -128,6 +130,27 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     });
   }
 
+  /////////////////////////////  obtener nombre
+  Future<void> getNameRemitenteGroupChat(String numElemento) async {
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroupWEB/name/$numElemento';
+
+    try {
+      var response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        var responseData = json.decode(response.body);
+        var nombreCompleto = responseData['NOMBRE_COMPLETO'];
+        NombreRemitente = nombreCompleto;
+        print(NombreRemitente);
+      } else {
+        throw Exception('Failed to fetch remitente name');
+      }
+    } catch (e) {
+      print('Error fetching remitente name: $e');
+    }
+  }
+
 ////////////////////////
 
   // Método para enviar el mensaje de audio
@@ -157,7 +180,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       if (response.statusCode == 200) {
         var responseData = json.decode(response.body);
         var audioUrl = responseData['audioUrl'];
-        
+
         var newMessage = {
           'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
           'FECHA': formattedDate,
@@ -165,6 +188,9 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'MENSAJE': audioUrl.toString(),
           'MEDIA': 'AUDIO',
           'UBICACION': audioUrl.toString(),
+           "NOMBRE_REMITENTE": NombreRemitente,
+           'ELEMENTO_NUMERO': widget.numElemento,
+
         };
         socket.emit('sendMessage', newMessage);
       } else {
@@ -287,6 +313,11 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'FECHA': formattedDate,
           'REMITENTE': widget.numElemento,
           'MENSAJE': message,
+          'MEDIA': "TXT",
+          'UBICACION': "NA",
+          'GRUPO_ID': widget.idGrupo,
+          'ELEMENTO_NUMERO': widget.numElemento,
+          'NOMBRE_REMITENTE': NombreRemitente
         };
         socket.emit('sendMessage', newMessage);
         messageController.clear();
@@ -346,6 +377,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'NOMBRE': 'XSX',
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
+              'ELEMENTO_NUMERO': widget.numElemento,
+             "NOMBRE_REMITENTE": NombreRemitente
         };
         socket.emit('sendMessage', newMessage);
       } else {
@@ -372,8 +405,6 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   }
 
   Widget _buildMessage(Map<String, dynamic> message) {
-
-    
     if (message == null) {
       return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
     }
@@ -436,7 +467,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
                       if (_isPlaying) {
                         await _stopPlaying();
                       } else {
-                        
+                        margin:
+                        0;
                         await _player.startPlayer(
                           fromURI:
                               '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
@@ -449,10 +481,10 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
                         setState(() {
                           _isPlaying = true;
                         });
-                        
+
                         print(
                             'REPRODUCIENDO DEEE:  ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
-                    }
+                      }
                     },
                   ),
                 ],

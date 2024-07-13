@@ -155,23 +155,24 @@ void _showErrorSnackBar(String message) {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.of(context).size.height;
+@override
+Widget build(BuildContext context) {
+  final double screenHeight = MediaQuery.of(context).size.height;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: <Widget>[
-          // Imagen de fondo
-          Positioned.fill(
-            child: Image.asset(
-              'lib/assets/fondoAzul.png',
-              fit: BoxFit.cover,
-            ),
+  return Scaffold(
+    resizeToAvoidBottomInset: true,
+    body: Stack(
+      children: <Widget>[
+        // Imagen de fondo
+        Positioned.fill(
+          child: Image.asset(
+            'lib/assets/fondoAzul.png',
+            fit: BoxFit.cover,
           ),
-          // Contenedor principal con campos de entrada
-          Column(
+        ),
+        // Contenedor principal con campos de entrada
+        SingleChildScrollView(
+          child: Column(
             children: <Widget>[
               // Icono de regresar
               Container(
@@ -194,7 +195,8 @@ void _showErrorSnackBar(String message) {
                   ),
                 ),
               ),
-              Spacer(),
+              // Espacio adicional para que el contenido se visualice mejor
+              SizedBox(height: 20),
               Container(
                 height: screenHeight * 0.70,
                 child: ClipRRect(
@@ -203,7 +205,7 @@ void _showErrorSnackBar(String message) {
                   ),
                   child: Container(
                     color: Colors.white,
-                    child: SingleChildScrollView(
+                    child: Padding(
                       padding: EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,6 +266,7 @@ void _showErrorSnackBar(String message) {
                               ),
                             ],
                           ),
+                          Spacer(), // Empuja los botones hacia abajo
                           // Botón de inicio de sesión
                           Container(
                             margin: EdgeInsets.symmetric(
@@ -282,7 +285,34 @@ void _showErrorSnackBar(String message) {
                                 'INICIAR SESIÓN',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w300,
-                                  color: Color.fromARGB(255, 255, 255, 255),
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Botón para crear cuenta
+                          Container(
+                            margin: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(0xFF073560),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12.0),
+                                ),
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                              ),
+                              onPressed: () {
+                                // Navegar a la pantalla de registro
+                                Navigator.pushNamed(context, '/register');
+                              },
+                              child: Text(
+                                'Crear cuenta',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white,
                                   fontSize: 15,
                                 ),
                               ),
@@ -297,10 +327,12 @@ void _showErrorSnackBar(String message) {
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _buildTextField({
     TextEditingController? controller,

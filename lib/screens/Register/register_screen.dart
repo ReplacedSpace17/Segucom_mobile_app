@@ -65,39 +65,118 @@ class _RegisterScreenState extends State<RegisterScreen> {
       print('Error en el registro: ${response.statusCode}');
     }
   }
+Future<void> VerificarDatos(String numeroTelefono, String numeroElemento, String nombre) async {
+  final String url = ConfigBackend.backendUrl + '/segucom/api/user/validar/$numeroTelefono/$numeroElemento';
 
-  @override
-  Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.of(context).size.height;
-    return Scaffold(
-      resizeToAvoidBottomInset:
-          true, // Importante para evitar problemas de teclado
-      body: Stack(
-        children: <Widget>[
-          // Imagen de fondo
-          Positioned.fill(
-            child: Image.asset(
-              'lib/assets/fondoAzul.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          // Contenedor principal con campos de entrada
-          Column(
-            children: <Widget>[
-              // Icono de regresar
-              Container(
-                margin: EdgeInsets.only(top: 40.0, left: 20.0),
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                ),
+  try {
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      //obtener el response.body
+      final jsonResponse = jsonDecode(response.body);
+      final NombreRecibido = jsonResponse['Nombre'];
+      // Mostrar un dialogo para confirmar la actualización del nombre
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Actualizar nombre'),
+            content: Text('¿Desea reemplazar el nombre asignado: $NombreRecibido por $nombre ?'),
+            actions: <Widget>[
+              TextButton(
+                child: Text('No'),
+                onPressed: () {
+                  //elaborar el json con los datos a enviar
+                  var user = {
+                                          "No_Empleado": int.tryParse(
+                                                  employeeNumberController
+                                                      .text) ??
+                                              0,
+                                          "Nombre": NombreRecibido,
+                                          "Telefono": phoneController.text,
+                                          "IMEI": imei,
+                                          "Clave": passwordController.text
+                                        };
+            _registerUser(user);
+            Navigator.of(context).pop();
+                },
               ),
-              Spacer(),
-              Container(
-                height: screenHeight * 0.88,
+              TextButton(
+                child: Text('Sí'),
+                onPressed: () {
+                  // elaborar el json con los datos a enviar
+                   var user = {
+                                          "No_Empleado": int.tryParse(
+                                                  employeeNumberController
+                                                      .text) ??
+                                              0,
+                                          "Nombre": nameController.text,
+                                          "Telefono": phoneController.text,
+                                          "IMEI": imei,
+                                          "Clave": passwordController.text
+                                        };
+                                         
+                                _registerUser(user);
+                 Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      // Si hay un error en la respuesta, mostrar el mensaje de error
+      final jsonResponse = jsonDecode(response.body);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(jsonResponse['message']),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  } catch (e) {
+    // Si ocurre un error de red o de cualquier otro tipo
+    print('Error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error de conexión o servidor'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+}
+
+@override
+Widget build(BuildContext context) {
+  final double screenHeight = MediaQuery.of(context).size.height;
+
+  return Scaffold(
+    resizeToAvoidBottomInset: true, // Importante para evitar problemas de teclado
+    body: Stack(
+      children: <Widget>[
+        // Imagen de fondo
+        Positioned.fill(
+          child: Image.asset(
+            'lib/assets/fondoAzul.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        // Contenedor principal con campos de entrada
+        Column(
+          children: <Widget>[
+            // Icono de regresar
+            Container(
+              margin: EdgeInsets.only(top: 40.0, left: 20.0),
+              alignment: Alignment.topLeft,
+              child: IconButton(
+                icon: Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            Expanded(
+              child: Container(
                 width: double.infinity,
                 child: ClipRRect(
                   borderRadius: BorderRadius.only(
@@ -108,10 +187,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: SingleChildScrollView(
                       padding: EdgeInsets.all(16.0),
                       child: Padding(
-                        // Agrega Padding para ajustar el ancho
-                        padding: EdgeInsets.symmetric(
-                            horizontal:
-                                20.0), // Ajusta este valor según sea necesario
+                        padding: EdgeInsets.symmetric(horizontal: 20.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
@@ -133,14 +209,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               icon: Icons.badge,
                               inputType: TextInputType.number,
                             ),
-                            SizedBox(height: 15), // Espacio reducido
+                            SizedBox(height: 15),
                             // Campo de nombre
                             _buildTextField(
                               controller: nameController,
                               label: 'Ingresa tú nombre',
                               icon: Icons.person,
                             ),
-                            SizedBox(height: 15), // Espacio reducido
+                            SizedBox(height: 15),
                             // Campo de teléfono
                             _buildTextField(
                               controller: phoneController,
@@ -148,7 +224,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               icon: Icons.phone,
                               inputType: TextInputType.phone,
                             ),
-                            SizedBox(height: 15), // Espacio reducido
+                            SizedBox(height: 15),
                             // Campo de contraseña
                             _buildTextField(
                               controller: passwordController,
@@ -156,7 +232,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               icon: Icons.lock,
                               obscureText: !showPassword,
                             ),
-                            SizedBox(height: 15), // Espacio reducido
+                            SizedBox(height: 15),
                             Center(
                               child: Text(
                                 'La clave debe contener mínimo 8 y máximo 12 caracteres, una letra mayúscula, un número.',
@@ -166,7 +242,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 15), // Espacio reducido
+                            SizedBox(height: 15),
                             // Checkbox para mostrar la contraseña
                             Row(
                               children: [
@@ -209,13 +285,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             // Botón de registro
                             Container(
-                              margin: EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 10),
+                              margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                               width: double.infinity,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Color(0xFF073560), // Color de fondo
+                                  backgroundColor: Color(0xFF073560),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12.0),
                                   ),
@@ -224,23 +298,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 onPressed: acceptTerms
                                     ? () {
                                         var user = {
-                                          "No_Empleado": int.tryParse(
-                                                  employeeNumberController
-                                                      .text) ??
-                                              0,
+                                          "No_Empleado": int.tryParse(employeeNumberController.text) ?? 0,
                                           "Nombre": nameController.text,
                                           "Telefono": phoneController.text,
                                           "IMEI": imei,
-                                          "Clave": passwordController.text
+                                          "Clave": passwordController.text,
                                         };
-                                        _registerUser(user);
+                                        VerificarDatos(phoneController.text, employeeNumberController.text, nameController.text);
                                       }
                                     : null,
                                 child: Text(
                                   'CREAR CUENTA',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w300, // Letra light
-                                    color: Color.fromARGB(255, 255, 255, 255),
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white,
                                     fontSize: 15,
                                   ),
                                 ),
@@ -253,14 +324,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _buildTextField({
+Widget _buildTextField({
     TextEditingController? controller,
     required String label,
     required IconData icon,

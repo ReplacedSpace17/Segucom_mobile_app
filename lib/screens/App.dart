@@ -85,32 +85,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     // Botón de backend
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 30, vertical: 10),
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Color.fromARGB(255, 255, 255, 255),
-                          foregroundColor: Color(0xFF073560), // Color del texto
-                          side: BorderSide(color: Color(0xFF073560)), // Color del borde
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                          padding: EdgeInsets.symmetric(vertical: 13.0),
-                        ),
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/configBackend');
-                        },
-                        child: Text(
-                          'CONFIGURAR BACKEND',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w300, // Letra light
-                            color: Color(0xFF073560),
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
+                    
                   ],
                 ),
               ),
