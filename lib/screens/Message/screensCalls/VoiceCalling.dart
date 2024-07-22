@@ -63,10 +63,15 @@ class ScreenVoiceCalling extends StatelessWidget {
                 SizedBox(height: 20),
                 // Información de la llamada en color blanco
                 Text(
-                  'Llamada de voz',
+                  'Llamada de voz en curso',
                   style: TextStyle(color: Colors.white),
                 ),
                 
+                Text(
+                  callerName,
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+                SizedBox(height: 20),
                 Text(
                   callerNumber,
                   style: TextStyle(fontSize: 16, color: Colors.white),

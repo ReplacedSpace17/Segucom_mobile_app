@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
@@ -43,9 +44,13 @@ class _MenuScreenState extends State<MenuScreen> {
       false; // Estado para controlar si la alerta está siendo mostrada
   final int requiredPressCount = 15;
 
+  late IO.Socket socket;
+
   @override
   void initState() {
     super.initState();
+    //inicializar chat
+
     _currentDateTime = DateTime.now();
     _startClockUpdates(); // Agregar inicio de actualización del reloj
     _startLocationUpdates();
@@ -88,7 +93,7 @@ class _MenuScreenState extends State<MenuScreen> {
           " Boletines: " +
           _numBoletines.toString();
       NotificationController.createNewNotification(
-          "Tienes nuevas asignaciones", mensaje);
+          "Resumen de asignaciones", mensaje);
     } else {
       print('Error al enviar ubicación: ${response.statusCode}');
     }

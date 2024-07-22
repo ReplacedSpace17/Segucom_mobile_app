@@ -2,41 +2,44 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:segucom_app/main.dart';
+import 'package:segucom_app/screens/Message/screensCalls/VideoCalling.dart';
+import 'package:segucom_app/screens/Message/screensCalls/VoiceCalling.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
+import 'package:vibration/vibration.dart';
 import '../../configBackend.dart';
 
 import 'package:flutter_sound/flutter_sound.dart';
 
-class ChatScreenGroup extends StatefulWidget {
+class ChatScreen extends StatefulWidget {
   //audio
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
 
   final Map<String, dynamic> chatData;
   final String numElemento;
-  final String idGrupo;
 
-  ChatScreenGroup(
-      {required this.chatData,
-      required this.numElemento,
-      required this.idGrupo});
+  ChatScreen({required this.chatData, required this.numElemento});
 
   @override
-  _ChatScreenGroupState createState() => _ChatScreenGroupState();
+  _ChatScreenState createState() => _ChatScreenState();
 }
 
-class _ChatScreenGroupState extends State<ChatScreenGroup> {
+class _ChatScreenState extends State<ChatScreen> {
   List<dynamic> messages = [];
   TextEditingController messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late IO.Socket socket;
   final ImagePicker _picker = ImagePicker();
   bool isTyping = false;
-  String NombreRemitente = '';
 
 // Variables para la grabación de audio
   FlutterSoundRecorder _recorder = FlutterSoundRecorder();
@@ -46,7 +49,26 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   bool _isPlaying = false;
   String _filePath = '';
 
+//llamadas
+  final _localRenderer = RTCVideoRenderer();
+  final _remoteRenderer = RTCVideoRenderer();
+  IO.Socket? _socket;
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
+  MediaStream? _remoteStream;
+  List<MediaDeviceInfo> _cameras = [];
+  List<MediaDeviceInfo> _microphones = [];
+  MediaDeviceInfo? _selectedCamera;
+  MediaDeviceInfo? _selectedMicrophone;
+bool _inCall = false;
+
+List<dynamic> DATA_Chat_Fetch = [];
+  
+  
   ///
+  ///
+  String _callerName = "Usuario";
+  String _callerNumber = "477";
 
   Future<void> _initialize() async {
     await _recorder.openRecorder();
@@ -64,31 +86,42 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
 
   @override
   void initState() {
+    //load nombre y numero
+     _loadNombre();
+    _loadTelefono();
     super.initState();
-    getNameRemitenteGroupChat(widget.numElemento);
     _initialize(); //inciializar grabador de audio
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
     });
-     socket.on('connect', (_) {
-      print('Connected to server');
-      // Unir al usuario a un grupo usando widget.idGrupo y widget.numElemento
-      if (widget.numElemento.isNotEmpty) {
-        socket?.emit('setId', widget.numElemento);
-      }
 
-      socket.emit('joinGroup', [widget.idGrupo, widget.numElemento]);
-      print('Usuario ${widget.numElemento} unido al grupo ${widget.idGrupo}');
-    });
     socket.on('receiveMessage', (data) {
       print('Nuevo mensaje recibido desde servidor: $data');
       _handleReceivedMessage(data);
     });
-
+  
     socket.connect();
     fetchMessages();
+
+   _requestPermissions();
+    _initializeRenderers();
+    _connectSocket();
+    _createPeerConnection();
+    _getMediaDevices();
   }
 
+ void _loadNombre() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _callerName = prefs.getString('Name') ?? '';
+    });
+  }
+    void _loadTelefono() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _callerNumber = prefs.getInt('NumeroTel').toString() ?? '';
+    });
+  }
   @override
   void dispose() {
     // Cerrar el grabador y reproductor de audio
@@ -99,7 +132,351 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     socket.disconnect();
     messageController.dispose();
 
+    /// llamadas
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _localStream?.dispose();
+    _peerConnection?.close();
     super.dispose();
+  }
+
+//////////////////////////////////////// llamadas
+
+  Future<void> _initializeRenderers() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+  }
+
+  void _requestPermissions() async {
+    await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+  }
+
+  void _connectSocket() {
+    _socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
+     
+      'transports': ['websocket'],
+    });
+
+    _socket?.on('connect', (_) {
+      print('connected');
+      if (widget.numElemento.isNotEmpty) {
+        _socket?.emit('setId', widget.numElemento);
+      }
+    });
+
+    _socket?.on('offer', (data) async {
+      print("Oferta recibida");
+      var description = RTCSessionDescription(data['sdp'], data['type']);
+      await _peerConnection?.setRemoteDescription(description);
+
+      
+      _showCallDialog(description, data['isVideoCall'], data['callerName'], data['callerNumber']);
+    });
+
+    _socket?.on('answer', (data) async {
+      var description = RTCSessionDescription(data['sdp'], data['type']);
+      await _peerConnection?.setRemoteDescription(description);
+    });
+
+    _socket?.on('candidate', (data) async {
+      var candidate = RTCIceCandidate(
+        data['candidate'],
+        data['sdpMid'],
+        data['sdpMLineIndex'],
+      );
+      await _peerConnection?.addCandidate(candidate);
+    });
+  }
+
+  Future<void> _createPeerConnection() async {
+    await _peerConnection?.close();
+
+    _peerConnection = await createPeerConnection({
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ]
+    }, {});
+
+    _peerConnection?.onIceCandidate = (candidate) {
+      _socket?.emit('candidate', {
+        'to': widget.chatData['ELEMENTO_NUM'],
+        'candidate': candidate?.candidate,
+        'sdpMid': candidate?.sdpMid,
+        'sdpMLineIndex': candidate?.sdpMLineIndex,
+      });
+    };
+
+    _peerConnection?.onTrack = (event) {
+      if (event.track.kind == 'video') {
+        _remoteRenderer.srcObject = event.streams[0];
+      }
+    };
+
+    _localStream = await _getUserMedia();
+    _localStream!.getTracks().forEach((track) {
+      _peerConnection!.addTrack(track, _localStream!);
+    });
+  }
+
+  Future<MediaStream> _getUserMedia() async {
+    try {
+      final Map<String, dynamic> mediaConstraints = {
+        'audio': _selectedMicrophone != null
+            ? {'deviceId': _selectedMicrophone!.deviceId}
+            : true,
+        'video': _selectedCamera != null
+            ? {'deviceId': _selectedCamera!.deviceId}
+            : true,
+      };
+      return await navigator.mediaDevices.getUserMedia(mediaConstraints);
+    } catch (e) {
+      print('Error getting user media: $e');
+      throw e;
+    }
+  }
+
+  void _getMediaDevices() async {
+    try {
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      setState(() {
+        _cameras =
+            devices.where((device) => device.kind == 'videoinput').toList();
+        _microphones =
+            devices.where((device) => device.kind == 'audioinput').toList();
+        if (_cameras.isNotEmpty) {
+          _selectedCamera = _cameras.firstWhere(
+            (camera) => camera.label.toLowerCase().contains('front'),
+            orElse: () => _cameras[0],
+          );
+        }
+        if (_microphones.isNotEmpty) {
+          _selectedMicrophone = _microphones[0];
+        }
+      });
+    } catch (e) {
+      print('Error enumerating devices: $e');
+    }
+  }
+
+  void _startCall() async {
+    try {
+      var offer =
+          await _peerConnection?.createOffer({'offerToReceiveVideo': true});
+      await _peerConnection?.setLocalDescription(offer!);
+      _socket?.emit('offer', {
+        'to': widget.chatData['ELEMENTO_NUM'],
+        'sdp': offer?.sdp,
+        'type': offer?.type,
+        'isVideoCall': true,
+        'callerName': _callerName,
+        'callerNumber': _callerNumber,
+      });
+      setState(() {
+        _inCall = true;
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScreenCalling(
+            localRenderer: _localRenderer,
+            remoteRenderer: _remoteRenderer,
+            onHangUp: _hangUp,
+       callerName: _callerName,
+            callerNumber: _callerNumber,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error starting video call: $e');
+    }
+  }
+
+  void _startVoiceCall() async {
+    try {
+      var offer =
+          await _peerConnection?.createOffer({'offerToReceiveVideo': false});
+      await _peerConnection?.setLocalDescription(offer!);
+      _socket?.emit('offer', {
+        'to': widget.chatData['ELEMENTO_NUM'],
+        'sdp': offer?.sdp,
+        'type': offer?.type,
+        'isVideoCall': false,
+        'callerName': _callerName,
+        'callerNumber': _callerNumber,
+      });
+      setState(() {
+        _inCall = true;
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScreenVoiceCalling(
+            localRenderer: _localRenderer,
+            remoteRenderer: _remoteRenderer,
+            onHangUp: _hangUp,
+            callerName: _callerName,
+            callerNumber: _callerNumber,
+            incomingStream:
+                null, // No se necesita stream de video en llamadas de voz
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error starting voice call: $e');
+    }
+  }
+
+  void _hangUp() {
+    _localStream?.getTracks().forEach((track) {
+      track.stop();
+    });
+
+    _localStream?.dispose();
+    _peerConnection?.close();
+    _createPeerConnection();
+
+    Navigator.pop(context);
+
+    setState(() {
+      _inCall = false;
+    });
+  }
+
+  void _showCallDialog(RTCSessionDescription description, bool isVideoCall, String callerName, String callerNumber) async {
+    final _audioPlayer = AudioPlayer();
+    bool _isRinging = true;
+
+    void playRingtoneAndVibration() {
+      _audioPlayer.setAsset('lib/assets/ringtone.mp3').then((_) {
+        _audioPlayer.play().catchError((error) {
+          print('Error reproduciendo tono de llamada: $error');
+        });
+      }).catchError((error) {
+        print('Error cargando tono de llamada: $error');
+      });
+
+      Vibration.hasVibrator().then((hasVibrator) {
+        if (hasVibrator == true) {
+          Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
+        }
+      }).catchError((error) {
+        print('Error al verificar la vibración: $error');
+      });
+    }
+
+    showDialog(
+      context: SegucomApp.navigatorKey.currentState!.context,
+      builder: (BuildContext context) {
+        playRingtoneAndVibration();
+
+        return AlertDialog(
+          title: const Text('Llamada entrante'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Tú tienes una llamada entrante'),
+              const SizedBox(height: 8.0),
+              if (isVideoCall)
+                const Text('Tipo: Videollamada')
+              else
+                const Text('Tipo: Llamada de voz'),
+              const SizedBox(height: 8.0),
+              Text('Caller: $callerName'),
+              const SizedBox(height: 8.0),
+              Text('Number: $callerNumber'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Rechazar'),
+              onPressed: () {
+                _audioPlayer.stop();
+                _isRinging = false;
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Aceptar'),
+              onPressed: () async {
+                _audioPlayer.stop();
+                _isRinging = false;
+
+                await _peerConnection?.setRemoteDescription(description);
+                var answer = await _peerConnection?.createAnswer();
+                await _peerConnection?.setLocalDescription(answer!);
+                _socket?.emit('answer', {
+                  'to': widget.chatData['ELEMENTO_NUM'],
+                  'sdp': answer?.sdp,
+                  'type': answer?.type,
+                });
+
+                Navigator.of(context).pop();
+
+                if (isVideoCall) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ScreenCalling(
+                        localRenderer: _localRenderer,
+                        remoteRenderer: _remoteRenderer,
+                        onHangUp: _hangUp,
+                        callerName: callerName,
+                        callerNumber: callerNumber,
+                      ),
+                    ),
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ScreenVoiceCalling(
+                        localRenderer: _localRenderer,
+                        remoteRenderer: _remoteRenderer,
+                        onHangUp: _hangUp,
+                        callerName: callerName,
+                        callerNumber: callerNumber,
+                        incomingStream: null,
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    Future.delayed(const Duration(seconds: 30), () {
+      if (_isRinging) {
+        _audioPlayer.stop();
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    });
+  }
+
+  void _switchCamera() async {
+    if (_localStream != null) {
+      final videoTrack = _localStream!
+          .getVideoTracks()
+          .firstWhere((track) => track.kind == 'video');
+      await Helper.switchCamera(videoTrack);
+    }
+  }
+
+  void _muteMic() async {
+    if (_localStream != null) {
+      final audioTrack = _localStream!
+          .getAudioTracks()
+          .firstWhere((track) => track.kind == 'audio');
+      final enabled = audioTrack.enabled;
+      audioTrack.enabled = !enabled;
+    }
   }
 
 //////////////////////// audio
@@ -118,7 +495,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     await _sendAudioMessage(_filePath);
   }
 
-  Future<void> _startPlaying() async {
+Future<void> _startPlaying() async {
+  try {
     await _player.startPlayer(
         fromURI: _filePath,
         whenFinished: () {
@@ -130,34 +508,17 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     setState(() {
       _isPlaying = true;
     });
+  } catch (e) {
+    print('Error starting player: $e');
   }
+}
+
 
   Future<void> _stopPlaying() async {
     await _player.stopPlayer();
     setState(() {
       _isPlaying = false;
     });
-  }
-
-  /////////////////////////////  obtener nombre
-  Future<void> getNameRemitenteGroupChat(String numElemento) async {
-    var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroupWEB/name/$numElemento';
-
-    try {
-      var response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        var responseData = json.decode(response.body);
-        var nombreCompleto = responseData['NOMBRE_COMPLETO'];
-        NombreRemitente = nombreCompleto;
-        print(NombreRemitente);
-      } else {
-        throw Exception('Failed to fetch remitente name');
-      }
-    } catch (e) {
-      print('Error fetching remitente name: $e');
-    }
   }
 
 ////////////////////////
@@ -176,7 +537,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/audio/groups/${widget.numElemento}/${widget.idGrupo}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/audio/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
 
     try {
       var request = http.MultipartRequest('POST', Uri.parse(url));
@@ -197,21 +558,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'MENSAJE': audioUrl.toString(),
           'MEDIA': 'AUDIO',
           'UBICACION': audioUrl.toString(),
-           "NOMBRE_REMITENTE": NombreRemitente,
-           'ELEMENTO_NUMERO': widget.numElemento,
-           'groupId': widget.idGrupo,
-          'NOMBRE': NombreRemitente,
-          'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO']
-
-
         };
         socket.emit('sendMessage', newMessage);
-        if (mounted) {
-    setState(() {
-      messages.add(newMessage);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-  }
       } else {
         throw Exception('Failed to send audio message');
       }
@@ -223,48 +571,41 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   Future<void> fetchMessages() async {
     try {
       final response = await http.get(Uri.parse(
-          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroup/groupid/${widget.idGrupo}'));
+          '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}'));
 
       if (response.statusCode == 200) {
-        Map<String, dynamic> data = json.decode(response.body);
+        List<dynamic> data = json.decode(response.body);
 
-        if (data.containsKey('MENSAJES')) {
-          List<dynamic> mensajes = data['MENSAJES'];
-          if (mensajes.isNotEmpty) {
-            print(mensajes); // Imprime los mensajes obtenidos
-
-            if (mounted) {
-              setState(() {
-                messages = mensajes.map((message) {
-                  // Convertir URL de imagen a absoluta si es una imagen
-                  if (message['MEDIA'] == 'IMAGE') {
-                    message['MENSAJE'] =
-                        '${ConfigBackend.backendUrlComunication}${message['UBICACION']}';
-                  }
-                  return {
-                    'MENSAJE_ID': message['MENSAJE_ID'],
-                    'FECHA': message['FECHA'],
-                    'REMITENTE': message['REMITENTE'],
-                    'MENSAJE': message['MENSAJE'],
-                    'MEDIA': message['MEDIA'],
-                    'UBICACION': message['UBICACION'],
-                    'ELEMENTO_NUMERO': message['ELEMENTO_NUMERO'],
-                    'NOMBRE': message['NOMBRE']
-                  };
-                }).toList();
-              });
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => _scrollToBottom());
-            }
-          } else {
-            if (mounted) {
-              setState(() {
-                messages = [];
-              });
-            }
+        if (data.isNotEmpty) {
+          List<dynamic> mensajes = data[0]['MENSAJES'];
+          DATA_Chat_Fetch = data;
+          if (mounted) {
+            setState(() {
+              messages = mensajes.map((message) {
+                // Convertir URL de imagen a absoluta si es una imagen
+                if (message['MEDIA'] == 'IMAGE') {
+                  message['MENSAJE'] =
+                      '${ConfigBackend.backendUrlComunication}${message['UBICACION']}';
+                }
+                return {
+                  'MENSAJE_ID': message['MENSAJE_ID'],
+                  'FECHA': message['FECHA'],
+                  'REMITENTE': message['REMITENTE'],
+                  'MENSAJE': message['MENSAJE'],
+                  'MEDIA': message['MEDIA'],
+                  'UBICACION': message['UBICACION'],
+                };
+              }).toList();
+            });
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _scrollToBottom());
           }
         } else {
-          throw Exception('Field MENSAJES not found in response');
+          if (mounted) {
+            setState(() {
+              messages = [];
+            });
+          }
         }
       } else {
         throw Exception('Failed to load messages');
@@ -282,7 +623,6 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       'MENSAJE': data['MENSAJE'],
       'MEDIA': data['MEDIA'],
       'UBICACION': data['UBICACION'],
-      'NOMBRE': data['NOMBRE'],
     };
 
     bool messageExists = messages
@@ -308,15 +648,14 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
 
     var requestBody = {
       "FECHA": formattedDate,
-      "RECEPTOR": widget.idGrupo,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
       "MENSAJE": message,
       "MEDIA": "TXT",
-      "UBICACION": "NA",
-      "GRUPO_ID": widget.idGrupo
+      "UBICACION": "NA"
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/group/${widget.numElemento}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
 
     try {
       final response = await http.post(
@@ -333,25 +672,9 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'FECHA': formattedDate,
           'REMITENTE': widget.numElemento,
           'MENSAJE': message,
-          'MEDIA': "TXT",
-          'UBICACION': "NA",
-          'GRUPO_ID': widget.idGrupo,
-          'ELEMENTO_NUMERO': widget.numElemento,
-          'NOMBRE_REMITENTE': NombreRemitente,
-          'groupId': widget.idGrupo,
-          'NOMBRE': NombreRemitente,
-          'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO']
         };
         socket.emit('sendMessage', newMessage);
         messageController.clear();
-        // Agregar el mensaje enviado a la lista messages
-      if (mounted) {
-        setState(() {
-          messages.add(newMessage);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-
       } else {
         throw Exception('Failed to send message');
       }
@@ -366,7 +689,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
 
     var requestBody = {
       "FECHA": formattedDate,
-      "RECEPTOR": widget.idGrupo,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
       "MENSAJE": '',
       "MEDIA": filePath,
       "TIPO_MEDIA": fileType,
@@ -374,7 +697,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     };
 
     var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/group/image/${widget.numElemento}/${widget.idGrupo}';
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
 
     try {
       // Convertir el requestBody a formato JSON
@@ -405,23 +728,10 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           'MENSAJE':
               '', // Asegúrate de convertir imageUrl a String si es necesario
           'MEDIA': 'IMAGE',
-          'NOMBRE': 'XSX',
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
-              'ELEMENTO_NUMERO': widget.numElemento,
-             "NOMBRE_REMITENTE": NombreRemitente,
-             'groupId': widget.idGrupo,
-             'NOMBRE': NombreRemitente,
-             'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO']
-
         };
         socket.emit('sendMessage', newMessage);
-        if (mounted) {
-    setState(() {
-      messages.add(newMessage);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-  }
       } else {
         throw Exception('Failed to send media message');
       }
@@ -446,17 +756,10 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   }
 
   Widget _buildMessage(Map<String, dynamic> message) {
-    if (message == null) {
-      return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
-    }
-
     bool isMe = message['REMITENTE'].toString() == widget.numElemento;
     bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
     bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
-    String messageText =
-        message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
-    String remitente = message['NOMBRE'] ?? '';
-    String fecha = message['FECHA'] ?? '';
+    String messageText = message['MENSAJE'];
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -483,7 +786,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           children: [
             if (isMedia)
               Image.network(
-                '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
@@ -505,16 +808,12 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
                       color: isMe ? Colors.white : Colors.black,
                     ),
                     onPressed: () async {
-                       print(
-                            'REPRODUCIENDO DEEE:  ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
                       if (_isPlaying) {
                         await _stopPlaying();
                       } else {
-                        margin:
-                        0;
                         await _player.startPlayer(
                           fromURI:
-                              '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                              '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                           whenFinished: () {
                             setState(() {
                               _isPlaying = false;
@@ -524,8 +823,6 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
                         setState(() {
                           _isPlaying = true;
                         });
-
-                       
                       }
                     },
                   ),
@@ -538,23 +835,11 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
               ),
             SizedBox(height: 4),
             Text(
-              fecha.isNotEmpty
-                  ? DateFormat('HH:mm').format(DateTime.parse(fecha))
-                  : '',
+              DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
               style: TextStyle(
                   color: isMe ? Colors.white70 : Colors.black54,
                   fontSize: 11,
                   fontWeight: FontWeight.w400),
-            ),
-            SizedBox(
-                height: 2), // Espacio entre el texto del mensaje y el remitente
-            Text(
-              remitente,
-              style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.black54,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
             ),
           ],
         ),
@@ -577,6 +862,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      
       appBar: AppBar(
         title: Row(
           children: [
@@ -584,7 +870,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
               backgroundImage: AssetImage('lib/assets/icons/contact.png'),
               radius: 20,
             ),
-            SizedBox(width: 10),
+            SizedBox(width: 16),
 Expanded(
   child: Text(
     '${widget.chatData["NOMBRE_COMPLETO"]}',
@@ -594,8 +880,21 @@ Expanded(
     textAlign: TextAlign.start, // Ajusta esto según tus necesidades
   ),
 ),
+
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.phone),
+            onPressed: _inCall
+                    ? null
+                    : _startVoiceCall,
+          ),
+          IconButton(
+            icon: Icon(Icons.videocam),
+           onPressed: _inCall ? null : _startCall,
+          ),
+        ],
       ),
       body: Column(
         children: [

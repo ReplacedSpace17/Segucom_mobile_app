@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/Home/Options/Option1.dart';
+import 'package:segucom_app/screens/Mi_perfil/UpdateName.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
@@ -41,10 +42,31 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   void _loadNombre() async {
+    /*
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _nombre = prefs.getString('Name') ?? '';
     });
+    */
+final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() async {
+      _tel = prefs.getInt('NumeroTel').toString() ?? '';
+      final url = Uri.parse(
+        ConfigBackend.backendUrl + '/segucom/api/user/personal/' + _tel);
+    print(url);
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      print(data);
+      setState(() {
+        _nombre = data['PERFIL_NOMBRE'];
+      });
+    } else {
+      print('Error al obtener el nombre: ${response.statusCode}');
+    }
+    });
+    //hacer una peticion al servidor para obtener el nombre
+    
   }
 
   void _loadNumElemento() async {
@@ -167,7 +189,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
           context,
           MaterialPageRoute(
               builder: (context) => WebViewScreen(
-                  url: 'https://segucom.mx/help/videos/mobile/', title: 'Menu de ayuda')),
+                  url: 'https://segucom.mx/help/videos/mobile/',
+                  title: 'Menu de ayuda')),
         );
         break;
     }
@@ -190,7 +213,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     SizedBox(height: 40),
                     Image.asset(
                       'lib/assets/icons/iconUser.png',
-                      width: 100, // Puedes ajustar el tamaño de la imagen según sea necesario
+                      width:
+                          100, // Puedes ajustar el tamaño de la imagen según sea necesario
                       height: 100,
                     ),
                     SizedBox(height: 20),
@@ -226,20 +250,40 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         'Teléfono', _tel, 'lib/assets/icons/phone.png'),
                     _buildCardInformation('Contraseña', '*********',
                         'lib/assets/icons/password.png'),
-                    SizedBox(height: 10), // Espacio adicional entre las cards y el botón
+                    SizedBox(
+                        height:
+                            10), // Espacio adicional entre las cards y el botón
                     Center(
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => UpdatePasswordScreen("8088")),
+                                builder: (context) =>
+                                    UpdatePasswordScreen("8088")),
                           );
                         },
                         child: Text('Cambiar Contraseña'),
                       ),
                     ),
-                    SizedBox(height: 10), // Espacio adicional entre las cards y el botón
+                    SizedBox(
+                        height:
+                            10), // Espacio adicional entre las cards y el botón
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => UpdateNameScreen("8088")),
+                          );
+                        },
+                        child: Text('Cambiar Nombre'),
+                      ),
+                    ),
+                    SizedBox(
+                        height:
+                            10), // Espacio adicional entre las cards y el botón
                     Center(
                       child: ElevatedButton(
                         onPressed: () {
@@ -252,6 +296,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         child: Text('Cerrar Sesión'),
                       ),
                     ),
+                    SizedBox(height: 10),
                   ],
                 ),
               ),

@@ -1,42 +1,72 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:segucom_app/Services_background/CallingService.dart';
+import 'package:segucom_app/Services_background/MessagesService.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:segucom_app/Services_background/UbicationService.dart';
+import 'package:segucom_app/Services_background/MessagesService.dart';
 import 'package:segucom_app/configBackend.dart';
 import 'package:segucom_app/screens/App.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:socket_io_client/socket_io_client.dart';
 import 'screens/Login/login_screen.dart';
 import 'screens/Register/register_screen.dart';
 import 'screens/Config/ScreenBackendConfig.dart';
 import 'screens/SplashScreen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
+  final SecurityContext securityContext;
+
+  MyHttpOverrides(this.securityContext);
+
   @override
   HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
+    return super.createHttpClient(securityContext)
       ..badCertificateCallback =
           (X509Certificate cert, String host, int port) => true;
   }
 }
 
+Future<SecurityContext> initializeSecurityContext() async {
+  SecurityContext securityContext = SecurityContext.defaultContext;
+  try {
+    final data = await rootBundle.load('lib/assets/certificates/PrivateKey.pem');
+    securityContext.setTrustedCertificatesBytes(data.buffer.asUint8List());
+  } catch (e) {
+    print('Error setting trusted certificates: $e');
+  }
+  return securityContext;
+}
+
+
 Future<void> main() async {
+  
+  
   WidgetsFlutterBinding.ensureInitialized();
 
   // Inicializa las notificaciones y el puerto de comunicación entre isolates
   await NotificationController.initializeLocalNotifications();
   await NotificationController.initializeIsolateReceivePort();
 
-  HttpOverrides.global = MyHttpOverrides();
+  
 
   await initializeService();
+   await Geolocator.openLocationSettings();
+  await Geolocator.requestPermission();
+  await Geolocator.isLocationServiceEnabled();
+  SecurityContext securityContext = await initializeSecurityContext();
+  HttpOverrides.global = MyHttpOverrides(securityContext);
   runApp(SegucomApp());
 }
 
@@ -52,9 +82,24 @@ class SegucomApp extends StatefulWidget {
 }
 
 class _SegucomAppState extends State<SegucomApp> {
+late CallingService _callingService;
+
   @override
   void initState() {
     NotificationController.startListeningNotificationEvents();
+    final MessageService messageService = MessageService('80100');
+    // Inicializa el servicio de llamadas
+    _callingService = CallingService(
+      callerName: 'Nombre del Llamador',  // Asigna un nombre de llamador apropiado
+      callerNumber: 'Número del Llamador',  // Asigna un número de llamador apropiado
+      userElementNumber: '80100',  // El número de elemento del usuario actual
+    );
+     // Llama al método initialize para configurar el servicio
+    _callingService.initialize().then((_) {
+      // Puedes agregar lógica adicional aquí después de la inicialización, si es necesario
+    }).catchError((error) {
+      print('Error al inicializar CallingService: $error');
+    });
     super.initState();
   }
 
@@ -187,6 +232,7 @@ class NotificationPage extends StatelessWidget {
   }
 }
 
+
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
 
@@ -194,11 +240,10 @@ Future<void> initializeService() async {
   const notificationId = 888;
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    notificationChannelId, // id
-    'MY FOREGROUND SERVICE', // title
-    description:
-        'This channel is used for important notifications.', // description
-    importance: Importance.low, // importance must be at low or higher level
+    notificationChannelId,
+    'MY FOREGROUND SERVICE',
+    description: 'This channel is used for important notifications.',
+    importance: Importance.high,
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -214,8 +259,8 @@ Future<void> initializeService() async {
       autoStart: true,
       isForegroundMode: true,
       notificationChannelId: notificationChannelId,
-      initialNotificationTitle: 'AWESOME SERVICE',
-      initialNotificationContent: 'Initializing',
+      initialNotificationTitle: 'SEGUCOM SERVICE',
+      initialNotificationContent: 'Service is running in the background',
       foregroundServiceNotificationId: notificationId,
     ),
     iosConfiguration: IosConfiguration(
@@ -226,35 +271,40 @@ Future<void> initializeService() async {
   );
 }
 
+
+
+
+
 @pragma('vm:entry-point')
 Future<bool> onIosBackground(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   return true;
 }
-
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
+  late IO.Socket socket;
   final UbicationService _ubicationService = UbicationService();
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? authToken = prefs.getString('authToken');
 
   final String _tel = prefs.getInt('NumeroTel').toString();
   final String _numElemento = prefs.getString('NumeroElemento')!;
 
+  // Instanciar MessageService con el número de elemento
+  
+
   if (authToken != null) {
-    // Obtener el número de teléfono y el número de elemento del usuario
-    
-     Timer.periodic(const Duration(minutes: 10), (timer) async {
-          if (service is AndroidServiceInstance) {
-            if (await service.isForegroundService()) {
-              _ubicationService.sendLocation("", _tel, _numElemento);
-              //METDODOS A EJECUTAR EN FOREGROUND
-              //NotificationController.createNewNotification(  "Hola", "Ubicacion enviada");
-            }
-          }
-        });
+    Timer.periodic(const Duration(seconds: 10), (timer) async {
+      if (service is AndroidServiceInstance) {
+        if (await service.isForegroundService()) {
+          _ubicationService.sendLocation("", _tel, _numElemento);
+          // Métodos a ejecutar en foreground
+          // NotificationController.createNewNotification("Hola", "Ubicacion enviada");
+        }
+      }
+    });
   }
 }
+

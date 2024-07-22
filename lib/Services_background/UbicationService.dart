@@ -9,15 +9,19 @@ class UbicationService {
   late Position _currentPosition;
   late DateTime _currentDateTime;
 
+
   Future<void> sendLocation(String personalId, String tel, String numElemento) async {
+    //NotificationController.createNewNotification(  "ff", "Funcion llamada");
     _currentDateTime = DateTime.now();
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-      );
+  desiredAccuracy: LocationAccuracy.best,
+  timeLimit: Duration(seconds: 10),
+);
       _currentPosition = position;
 
       if (_currentPosition != null) {
+      //  NotificationController.createNewNotification(  "Posi", "Funcion llamada");
         final url = Uri.parse(
           ConfigBackend.backendUrl + '/segucom/api/maps/elemento/' + tel,
         );
@@ -31,18 +35,22 @@ class UbicationService {
           "NumTel": tel,
           "ELEMENTO_NUM": numElemento,
         };
-        print(body);
+        print('Enviando ubicación al servidor ... ' + body['Hora'].toString());
+         
         final response = await http.put(
           url,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
         );
         if (response.statusCode == 200) {
-          //NotificationController.createNewNotification(  "Hola", "Ubicacion enviada");
+         NotificationController.createNewNotification(  "Hola", "Ubicacion enviada");
           print('Ubicación enviada al servidor');
         } else {
           print('Error al enviar ubicación: ${response.statusCode}');
         }
+      }
+      else{
+         //NotificationController.createNewNotification(  "NO", "No obtuvo la ubi en segundo plano");
       }
     } catch (e) {
       print("Error al obtener la ubicación: $e");

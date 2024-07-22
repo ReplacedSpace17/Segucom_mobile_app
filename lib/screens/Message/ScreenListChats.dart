@@ -117,138 +117,137 @@ class _ChatListScreenState extends State<ChatListScreen> {
       futureChatsGroups = fetchChatsGroups();
     });
   }
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text('Chats'),
+    ),
+    body: RefreshIndicator(
+      onRefresh: _refreshChats,
+      child: FutureBuilder<List<dynamic>>(
+        future: Future.wait([futureChats, futureChatsGroups]),
+        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData ||
+              (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
+            return Center(child: Text('No hay chats disponibles'));
+          } else {
+            List<dynamic> chats = snapshot.data![0];
+            List<dynamic> chatsGroups = snapshot.data![1];
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Chats'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refreshChats,
-        child: FutureBuilder<List<dynamic>>(
-          future: Future.wait([futureChats, futureChatsGroups]),
-          builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            } else if (!snapshot.hasData ||
-                snapshot.data!.isEmpty ||
-                snapshot.data!.first.isEmpty) {
-              return Center(child: Text('No hay chats disponibles'));
-            } else {
-              List<dynamic> chats = snapshot.data![0];
-              List<dynamic> chatsGroups = snapshot.data![1];
-
-              return ListView.builder(
-                itemCount: chats.length + chatsGroups.length,
-                itemBuilder: (context, index) {
-                  if (index < chats.length) {
-                    var chat = chats[index];
-                    return Column(
-                      children: [
-                        ListTile(
-                          leading: Image.asset(
-                            'lib/assets/icons/contact.png',
-                            width: 48,
-                            height: 48,
-                          ),
-                          title: Text(
-                            '${chat['NOMBRE_COMPLETO']}',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text('${chat['ULTIMO_MENSAJE']}'),
-                          onTap: () async {
-                            // Navegar a ChatScreen y esperar resultado
-                            var result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(
-                                  chatData: chat,
-                                  numElemento: _numElemento,
-                                ),
+            return ListView.builder(
+              itemCount: chats.length + chatsGroups.length,
+              itemBuilder: (context, index) {
+                if (index < chats.length) {
+                  var chat = chats[index];
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Image.asset(
+                          'lib/assets/icons/contact.png',
+                          width: 48,
+                          height: 48,
+                        ),
+                        title: Text(
+                          '${chat['NOMBRE_COMPLETO']}',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text('${chat['ULTIMO_MENSAJE']}'),
+                        onTap: () async {
+                          // Navegar a ChatScreen y esperar resultado
+                          var result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreen(
+                                chatData: chat,
+                                numElemento: _numElemento,
                               ),
-                            );
+                            ),
+                          );
 
-                            // Actualizar la lista de chats si se envió un mensaje
-                            if (result != null && result is bool && result) {
-                              setState(() {
-                                futureChats = fetchChats();
-                              });
-                            }
-                          },
+                          // Actualizar la lista de chats si se envió un mensaje
+                          if (result != null && result is bool && result) {
+                            setState(() {
+                              futureChats = fetchChats();
+                            });
+                          }
+                        },
+                      ),
+                      Divider(
+                        color: Colors.grey,
+                        thickness: 1.0,
+                        indent: 16.0,
+                        endIndent: 16.0,
+                      ),
+                    ],
+                  );
+                } else {
+                  var chatGroup = chatsGroups[index - chats.length];
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Image.asset(
+                          'lib/assets/icons/contact.png',
+                          width: 48,
+                          height: 48,
                         ),
-                        Divider(
-                          color: Colors.grey,
-                          thickness: 1.0,
-                          indent: 16.0,
-                          endIndent: 16.0,
+                        title: Text(
+                          '${chatGroup['NOMBRE_COMPLETO']}',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                      ],
-                    );
-                  } else {
-                    var chatGroup = chatsGroups[index - chats.length];
-                    return Column(
-                      children: [
-                        ListTile(
-                          leading: Image.asset(
-                            'lib/assets/icons/contact.png',
-                            width: 48,
-                            height: 48,
-                          ),
-                          title: Text(
-                            '${chatGroup['NOMBRE_COMPLETO']}',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
-                          onTap: () async {
-                            // Navegar a ChatScreen y esperar resultado
-                            var result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreenGroup(
-                                  chatData: chatGroup,
-                                  numElemento: _numElemento,
-                                  idGrupo: chatGroup['GRUPO_ID'].toString(),
-                                ),
+                        subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
+                        onTap: () async {
+                          // Navegar a ChatScreen y esperar resultado
+                          var result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreenGroup(
+                                chatData: chatGroup,
+                                numElemento: _numElemento,
+                                idGrupo: chatGroup['GRUPO_ID'].toString(),
                               ),
-                            );
+                            ),
+                          );
 
-                            // Actualizar la lista de chats si se envió un mensaje
-                            if (result != null && result is bool && result) {
-                              setState(() {
-                                futureChatsGroups = fetchChatsGroups();
-                              });
-                            }
-                          },
-                        ),
-                        Divider(
-                          color: Colors.grey,
-                          thickness: 1.0,
-                          indent: 16.0,
-                          endIndent: 16.0,
-                        ),
-                      ],
-                    );
-                  }
-                },
-              );
-            }
-          },
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NewMessageScreen(),
-            ),
-          );
+                          // Actualizar la lista de chats si se envió un mensaje
+                          if (result != null && result is bool && result) {
+                            setState(() {
+                              futureChatsGroups = fetchChatsGroups();
+                            });
+                          }
+                        },
+                      ),
+                      Divider(
+                        color: Colors.grey,
+                        thickness: 1.0,
+                        indent: 16.0,
+                        endIndent: 16.0,
+                      ),
+                    ],
+                  );
+                }
+              },
+            );
+          }
         },
-        child: Icon(Icons.add),
       ),
-    );
-  }
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NewMessageScreen(),
+          ),
+        );
+      },
+      child: Icon(Icons.add),
+    ),
+  );
+}
+
 }

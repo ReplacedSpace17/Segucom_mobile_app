@@ -107,6 +107,7 @@ flutter:
     - lib/assets/ringtone.mp3
     - lib/assets/iconUser.png
     - lib/assets/fondoCall.png
+    - lib/assets/certificates/PrivateKey.pem
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
