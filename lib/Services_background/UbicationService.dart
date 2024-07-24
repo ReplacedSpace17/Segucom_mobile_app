@@ -43,7 +43,7 @@ class UbicationService {
           body: jsonEncode(body),
         );
         if (response.statusCode == 200) {
-         NotificationController.createNewNotification(  "Hola", "Ubicacion enviada");
+        // NotificationController.createNewNotification(  "Hola", "Ubicacion enviada");
           print('Ubicación enviada al servidor');
         } else {
           print('Error al enviar ubicación: ${response.statusCode}');

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:flutter/services.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -60,11 +61,10 @@ class _ChatScreenState extends State<ChatScreen> {
   List<MediaDeviceInfo> _microphones = [];
   MediaDeviceInfo? _selectedCamera;
   MediaDeviceInfo? _selectedMicrophone;
-bool _inCall = false;
+  bool _inCall = false;
 
-List<dynamic> DATA_Chat_Fetch = [];
-  
-  
+  List<dynamic> DATA_Chat_Fetch = [];
+
   ///
   ///
   String _callerName = "Usuario";
@@ -87,7 +87,7 @@ List<dynamic> DATA_Chat_Fetch = [];
   @override
   void initState() {
     //load nombre y numero
-     _loadNombre();
+    _loadNombre();
     _loadTelefono();
     super.initState();
     _initialize(); //inciializar grabador de audio
@@ -99,37 +99,39 @@ List<dynamic> DATA_Chat_Fetch = [];
       print('Nuevo mensaje recibido desde servidor: $data');
       _handleReceivedMessage(data);
     });
-  
+
     socket.connect();
     fetchMessages();
 
-   _requestPermissions();
+    _requestPermissions();
     _initializeRenderers();
     _connectSocket();
     _createPeerConnection();
     _getMediaDevices();
   }
 
- void _loadNombre() async {
+  void _loadNombre() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _callerName = prefs.getString('Name') ?? '';
     });
   }
-    void _loadTelefono() async {
+
+  void _loadTelefono() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _callerNumber = prefs.getInt('NumeroTel').toString() ?? '';
     });
   }
+
   @override
   void dispose() {
     // Cerrar el grabador y reproductor de audio
     _recorder.closeRecorder();
     _player.closePlayer();
 
-    socket.off('receiveMessage', _handleReceivedMessage);
-    socket.disconnect();
+   // socket.off('receiveMessage', _handleReceivedMessage);
+    //socket.disconnect();
     messageController.dispose();
 
     /// llamadas
@@ -155,8 +157,8 @@ List<dynamic> DATA_Chat_Fetch = [];
   }
 
   void _connectSocket() {
-    _socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
-     
+    _socket =
+        IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
     });
 
@@ -172,8 +174,8 @@ List<dynamic> DATA_Chat_Fetch = [];
       var description = RTCSessionDescription(data['sdp'], data['type']);
       await _peerConnection?.setRemoteDescription(description);
 
-      
-      _showCallDialog(description, data['isVideoCall'], data['callerName'], data['callerNumber']);
+      _showCallDialog(description, data['isVideoCall'], data['callerName'],
+          data['callerNumber']);
     });
 
     _socket?.on('answer', (data) async {
@@ -285,7 +287,7 @@ List<dynamic> DATA_Chat_Fetch = [];
             localRenderer: _localRenderer,
             remoteRenderer: _remoteRenderer,
             onHangUp: _hangUp,
-       callerName: _callerName,
+            callerName: _callerName,
             callerNumber: _callerNumber,
           ),
         ),
@@ -347,7 +349,8 @@ List<dynamic> DATA_Chat_Fetch = [];
     });
   }
 
-  void _showCallDialog(RTCSessionDescription description, bool isVideoCall, String callerName, String callerNumber) async {
+  void _showCallDialog(RTCSessionDescription description, bool isVideoCall,
+      String callerName, String callerNumber) async {
     final _audioPlayer = AudioPlayer();
     bool _isRinging = true;
 
@@ -495,24 +498,23 @@ List<dynamic> DATA_Chat_Fetch = [];
     await _sendAudioMessage(_filePath);
   }
 
-Future<void> _startPlaying() async {
-  try {
-    await _player.startPlayer(
-        fromURI: _filePath,
-        whenFinished: () {
-          setState(() {
-            _isPlaying = false;
+  Future<void> _startPlaying() async {
+    try {
+      await _player.startPlayer(
+          fromURI: _filePath,
+          whenFinished: () {
+            setState(() {
+              _isPlaying = false;
+            });
           });
-        });
-    print("LINK DE AUDIO:" + _filePath);
-    setState(() {
-      _isPlaying = true;
-    });
-  } catch (e) {
-    print('Error starting player: $e');
+      print("LINK DE AUDIO:" + _filePath);
+      setState(() {
+        _isPlaying = true;
+      });
+    } catch (e) {
+      print('Error starting player: $e');
+    }
   }
-}
-
 
   Future<void> _stopPlaying() async {
     await _player.stopPlayer();
@@ -562,13 +564,14 @@ Future<void> _startPlaying() async {
           'NOMBRE': widget.chatData['NOMBRE_COMPLETO']
         };
         socket.emit('sendMessage', newMessage);
-         // Agregar el mensaje enviado a la lista messages
-      if (mounted) {
-        setState(() {
-          messages.add(newMessage);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
+        // Agregar el mensaje enviado a la lista messages
+        if (mounted) {
+          setState(() {
+            messages.add(newMessage);
+          });
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
       } else {
         throw Exception('Failed to send audio message');
       }
@@ -623,8 +626,12 @@ Future<void> _startPlaying() async {
       print('Error fetching messages: $e');
     }
   }
-
-  void _handleReceivedMessage(dynamic data) {
+void _handleReceivedMessage(dynamic data) {
+  // Verificar si el mensaje pertenece al grupo actual y el remitente es el correcto
+  //imprimir el to y el numElemento
+  print('To: ${data['to']}');
+  print('NumElemento: ${widget.numElemento}');
+  if (data['to'].toString() == widget.numElemento.toString()) {
     var receivedMessage = {
       'MENSAJE_ID': data['MENSAJE_ID'],
       'FECHA': data['FECHA'],
@@ -634,8 +641,8 @@ Future<void> _startPlaying() async {
       'UBICACION': data['UBICACION'],
     };
 
-    bool messageExists = messages
-        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+    // Verificar si el mensaje ya existe en la lista de mensajes
+    bool messageExists = messages.any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
 
     if (!messageExists) {
       if (mounted) {
@@ -646,64 +653,69 @@ Future<void> _startPlaying() async {
           }
           messages.add(receivedMessage);
         });
+        // Desplazarse al final de la lista de mensajes
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
     }
-  }
-
- Future<void> sendMessage(String message) async {
-  var currentDate = DateTime.now();
-  var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
-
-  var requestBody = {
-    "FECHA": formattedDate,
-    "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
-    "MENSAJE": message,
-    "MEDIA": "TXT",
-    "UBICACION": "NA"
-  };
-
-  var url =
-      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
-
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(requestBody),
-    );
-
-    if (response.statusCode == 200) {
-      var newMessage = {
-        'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
-        'FECHA': formattedDate,
-        'REMITENTE': widget.numElemento,
-        'MENSAJE': message,
-        'MEDIA': 'TXT',
-        'UBICACION': 'NA',
-        'to': widget.chatData['ELEMENTO_NUM'],
-        'NOMBRE': _callerName
-      };
-      print(newMessage);
-      socket.emit('sendMessage', newMessage);
-      messageController.clear();
-
-      // Agregar el mensaje enviado a la lista messages
-      if (mounted) {
-        setState(() {
-          messages.add(newMessage);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-    } else {
-      throw Exception('Failed to send message');
-    }
-  } catch (e) {
-    print('Error sending message: $e');
+  } else {
+    print('Mensaje recibido no pertenece al grupo actual o el remitente no coincide: Grupo ID ${data['GRUPO_ID']} y Remitente ${data['REMITENTE']}');
   }
 }
+
+  Future<void> sendMessage(String message) async {
+    var currentDate = DateTime.now();
+    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+
+    var requestBody = {
+      "FECHA": formattedDate,
+      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+      "MENSAJE": message,
+      "MEDIA": "TXT",
+      "UBICACION": "NA"
+    };
+
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/${widget.numElemento}';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        var newMessage = {
+          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+          'FECHA': formattedDate,
+          'REMITENTE': widget.numElemento,
+          'MENSAJE': message,
+          'MEDIA': 'TXT',
+          'UBICACION': 'NA',
+          'to': widget.chatData['ELEMENTO_NUM'],
+          'NOMBRE': _callerName
+        };
+        print(newMessage);
+        socket.emit('sendMessage', newMessage);
+        messageController.clear();
+
+        // Agregar el mensaje enviado a la lista messages
+        if (mounted) {
+          setState(() {
+            messages.add(newMessage);
+          });
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
+      } else {
+        throw Exception('Failed to send message');
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+    }
+  }
 
   Future<void> _sendMediaMessage(String filePath, String fileType) async {
     var currentDate = DateTime.now();
@@ -752,17 +764,18 @@ Future<void> _startPlaying() async {
           'MEDIA': 'IMAGE',
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
-            'to': widget.chatData['ELEMENTO_NUM'],
-            'NOMBRE': _callerName
+          'to': widget.chatData['ELEMENTO_NUM'],
+          'NOMBRE': _callerName
         };
         socket.emit('sendMessage', newMessage);
-         // Agregar el mensaje enviado a la lista messages
-      if (mounted) {
-        setState(() {
-          messages.add(newMessage);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
+        // Agregar el mensaje enviado a la lista messages
+        if (mounted) {
+          setState(() {
+            messages.add(newMessage);
+          });
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
       } else {
         throw Exception('Failed to send media message');
       }
@@ -842,6 +855,9 @@ Future<void> _startPlaying() async {
                       if (_isPlaying) {
                         await _stopPlaying();
                       } else {
+                        // Reproducir el audio
+                        print(
+                            'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
                         await _player.startPlayer(
                           fromURI:
                               '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
@@ -893,7 +909,6 @@ Future<void> _startPlaying() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       appBar: AppBar(
         title: Row(
           children: [
@@ -902,28 +917,25 @@ Future<void> _startPlaying() async {
               radius: 20,
             ),
             SizedBox(width: 16),
-Expanded(
-  child: Text(
-    '${widget.chatData["NOMBRE_COMPLETO"]}',
-    style: TextStyle(fontSize: 18),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    textAlign: TextAlign.start, // Ajusta esto según tus necesidades
-  ),
-),
-
+            Expanded(
+              child: Text(
+                '${widget.chatData["NOMBRE_COMPLETO"]}',
+                style: TextStyle(fontSize: 18),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.start, // Ajusta esto según tus necesidades
+              ),
+            ),
           ],
         ),
         actions: [
           IconButton(
             icon: Icon(Icons.phone),
-            onPressed: _inCall
-                    ? null
-                    : _startVoiceCall,
+            onPressed: _inCall ? null : _startVoiceCall,
           ),
           IconButton(
             icon: Icon(Icons.videocam),
-           onPressed: _inCall ? null : _startCall,
+            onPressed: _inCall ? null : _startCall,
           ),
         ],
       ),

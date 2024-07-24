@@ -95,8 +95,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     _recorder.closeRecorder();
     _player.closePlayer();
 
-    socket.off('receiveMessage', _handleReceivedMessage);
-    socket.disconnect();
+    
     messageController.dispose();
 
     super.dispose();
@@ -274,7 +273,11 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     }
   }
 
-  void _handleReceivedMessage(dynamic data) {
+void _handleReceivedMessage(dynamic data) {
+  // Verificar si el mensaje pertenece al grupo actual
+  print('GRUPO_ID: ${data['GRUPO_ID']}');
+  print('ID GRUPO: ${widget.idGrupo}');
+  if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
     var receivedMessage = {
       'MENSAJE_ID': data['MENSAJE_ID'],
       'FECHA': data['FECHA'],
@@ -285,8 +288,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       'NOMBRE': data['NOMBRE'],
     };
 
-    bool messageExists = messages
-        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+    // Verificar si el mensaje ya existe en la lista de mensajes
+    bool messageExists = messages.any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
 
     if (!messageExists) {
       if (mounted) {
@@ -297,10 +300,14 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           }
           messages.add(receivedMessage);
         });
+        // Desplazarse al final de la lista de mensajes
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
     }
+  } else {
+    print('Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
   }
+}
 
   Future<void> sendMessage(String message) async {
     var currentDate = DateTime.now();

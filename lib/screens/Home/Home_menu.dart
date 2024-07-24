@@ -63,9 +63,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
     // Iniciar el listener para cambios en el volumen
 
-    VolumeWatcher.setVolume(1.0); // 1.0 representa el 100% de volumen
+    
     // Configurar el listener para cambios en el volumen
-    VolumeWatcher.addListener(_onVolumeChanged);
+    
   }
 
   Future<void> _getNotifications() async {
@@ -123,7 +123,7 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    VolumeWatcher.removeListener(_onVolumeChanged as int?);
+    
 
     super.dispose();
   }
@@ -589,61 +589,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /////////////////////////////////////////////////////////////////////////////// boton de panico
-  void _onVolumeChanged(double volume) {
-    print("Current Volume: $volume");
-    // Verificar si la alerta está siendo mostrada
-    if (!alertShowing) {
-      // Verificar que el volumen esté disminuyendo (botón de bajar volumen)
-      if (volume < 1.0) {
-        // volume es un valor entre 0 y 1, donde 1 es volumen máximo
-        setState(() {
-          buttonPressCount++;
-          // Verificar si se ha alcanzado el número requerido de pulsaciones
-          if (buttonPressCount >= requiredPressCount) {
-            _showPanicAlert();
-            // Desactivar el conteo hasta que se cierre la alerta
-            buttonPressCount = 0;
-            alertShowing = true;
-          }
-        });
-      }
-    }
-  }
+  
 
-  void _showPanicAlert() {
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Impide cerrar la alerta haciendo clic afuera
-      builder: (context) => AlertDialog(
-        title: Text('Estás activando el botón de pánico'),
-        content: Text('¿Deseas enviar una alerta?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              VolumeWatcher.setVolume(1.0);
-              Navigator.pop(context);
-              setState(() {
-                alertShowing = false; // Habilitar el conteo nuevamente
-              });
-              // Acción para "Sí"
-              // Aquí puedes agregar el código para enviar la alerta
-            },
-            child: Text('Sí'),
-          ),
-          TextButton(
-            onPressed: () {
-              VolumeWatcher.setVolume(1.0);
-              Navigator.pop(context);
-              setState(() {
-                alertShowing = false; // Habilitar el conteo nuevamente
-              });
-              // Acción para "No"
-              // Aquí puedes agregar el código si es necesario
-            },
-            child: Text('No'),
-          ),
-        ],
-      ),
-    );
-  }
+  
 }

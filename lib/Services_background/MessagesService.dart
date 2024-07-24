@@ -37,7 +37,7 @@ class MessageService {
 
     try {
       final response = await http.get(Uri.parse('${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroupWEB/ids/$_numElemento'));
-
+      
       if (response.statusCode == 200) {
         List<dynamic> groupIds = json.decode(response.body);
 
@@ -58,6 +58,7 @@ class MessageService {
   }
 
   void _onConnectError(data) {
+    print('${ConfigBackend.backendUrlComunication}/segucomunication/api/messagesGroupWEB/ids/$_numElemento');
     print('Error de conexión: $data');
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:segucom_app/Services_background/CallingService.dart';
 import 'package:segucom_app/Services_background/MessagesService.dart';
+import 'package:segucom_app/Services_background/VolumeService.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ import 'screens/Register/register_screen.dart';
 import 'screens/Config/ScreenBackendConfig.dart';
 import 'screens/SplashScreen.dart';
 
+/*
 class MyHttpOverrides extends HttpOverrides {
   final SecurityContext securityContext;
 
@@ -34,14 +36,14 @@ class MyHttpOverrides extends HttpOverrides {
   HttpClient createHttpClient(SecurityContext? context) {
     return super.createHttpClient(securityContext)
       ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => true;
+          (X509Certificate cert, String host, int port) => true; // Permitir certificados no verificados solo para pruebas
   }
 }
 
 Future<SecurityContext> initializeSecurityContext() async {
   SecurityContext securityContext = SecurityContext.defaultContext;
   try {
-    final data = await rootBundle.load('lib/assets/certificates/PrivateKey.pem');
+    final data = await rootBundle.load('lib/assets/certificates/segubackend.com_2024.pem');
     securityContext.setTrustedCertificatesBytes(data.buffer.asUint8List());
   } catch (e) {
     print('Error setting trusted certificates: $e');
@@ -49,6 +51,7 @@ Future<SecurityContext> initializeSecurityContext() async {
   return securityContext;
 }
 
+*/
 
 Future<void> main() async {
   
@@ -65,8 +68,8 @@ Future<void> main() async {
    await Geolocator.openLocationSettings();
   await Geolocator.requestPermission();
   await Geolocator.isLocationServiceEnabled();
-  SecurityContext securityContext = await initializeSecurityContext();
-  HttpOverrides.global = MyHttpOverrides(securityContext);
+  //SecurityContext securityContext = await initializeSecurityContext();
+  //HttpOverrides.global = MyHttpOverrides(securityContext);
   runApp(SegucomApp());
 }
 
@@ -86,9 +89,10 @@ late CallingService _callingService;
 
   @override
   void initState() {
-    NotificationController.startListeningNotificationEvents();
-    final MessageService messageService = MessageService('80100');
+    //NotificationController.startListeningNotificationEvents();
+   
     // Inicializa el servicio de llamadas
+    /*
     _callingService = CallingService(
       callerName: 'Nombre del Llamador',  // Asigna un nombre de llamador apropiado
       callerNumber: 'Número del Llamador',  // Asigna un número de llamador apropiado
@@ -100,6 +104,7 @@ late CallingService _callingService;
     }).catchError((error) {
       print('Error al inicializar CallingService: $error');
     });
+    */
     super.initState();
   }
 
@@ -160,7 +165,8 @@ class _SplashScreenState extends State<SplashScreen> {
           // Si la respuesta es exitosa, puedes procesar los datos aquí
           final Map<String, dynamic> userData = jsonDecode(response.body);
           print('Datos del usuario: $userData');
-
+          final String _numElemento = prefs.getString('NumeroElemento')!;
+          final MessageService messageService = MessageService(_numElemento);
           // Navegar al menú principal u otra pantalla segura
           Navigator.pushReplacementNamed(context, '/menu');
         } else {
@@ -292,11 +298,17 @@ void onStart(ServiceInstance service) async {
   final String _tel = prefs.getInt('NumeroTel').toString();
   final String _numElemento = prefs.getString('NumeroElemento')!;
 
-  // Instanciar MessageService con el número de elemento
   
+    final VolumeService volumeService = VolumeService(); // Inicializar VolumeService
+
+
 
   if (authToken != null) {
-    Timer.periodic(const Duration(seconds: 10), (timer) async {
+//INICIA EL SERVICIO DE MENSAJES
+// INICIA AQUI EL BTON DE PANICO
+    NotificationController.startListeningNotificationEvents();
+    //INICIA EL SERVICIO DE UBICACION
+    Timer.periodic(const Duration(minutes: 10), (timer) async {
       if (service is AndroidServiceInstance) {
         if (await service.isForegroundService()) {
           _ubicationService.sendLocation("", _tel, _numElemento);

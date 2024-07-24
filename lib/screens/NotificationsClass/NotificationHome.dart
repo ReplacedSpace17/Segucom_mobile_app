@@ -91,11 +91,7 @@ class NotificationController {
 
   static Future<void> onActionReceivedImplementationMethod(
       ReceivedAction receivedAction) async {
-    SegucomApp.navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/notification-page',
-        (route) =>
-            (route.settings.name != '/notification-page') || route.isFirst,
-        arguments: receivedAction);
+    // Aquí puedes dejar este método vacío para que no haga nada
   }
 
   ///  *********************************************
@@ -177,22 +173,9 @@ class NotificationController {
             channelKey: 'alerts',
             title: title,
             body: text,
-            
             largeIcon: 'https://storage.googleapis.com/cms-storage-bucket/0dbfcc7a59cd1cf16282.png',
             notificationLayout: NotificationLayout.BigPicture,
             payload: {'notificationId': '1234567890'}),
-        actionButtons: [
-          NotificationActionButton(key: 'REDIRECT', label: 'Redirect'),
-          NotificationActionButton(
-              key: 'REPLY',
-              label: 'Reply Message',
-              requireInputText: true,
-              actionType: ActionType.SilentAction),
-          NotificationActionButton(
-              key: 'DISMISS',
-              label: 'Dismiss',
-              actionType: ActionType.DismissAction,
-              isDangerousOption: true)
-        ]);
+        actionButtons: []); // Sin botones de acción
   }
 }
