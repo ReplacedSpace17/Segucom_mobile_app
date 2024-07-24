@@ -28,6 +28,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   String _numElemento = '';
   String _tel = '';
   int _selectedIndex = 1;
+  String _licencia  = '';
 
   @override
   void initState() {
@@ -60,7 +61,10 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
       print(data);
       setState(() {
         _nombre = data['PERFIL_NOMBRE'];
+        _licencia = data['PERFIL_LICENCIA'];
+        //_licencia = "ABCDDDDDDDDDDDDDDDDD";
       });
+
     } else {
       print('Error al obtener el nombre: ${response.statusCode}');
     }
@@ -68,6 +72,8 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
     //hacer una peticion al servidor para obtener el nombre
     
   }
+
+  
 
   void _loadNumElemento() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -250,6 +256,8 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                         'Teléfono', _tel, 'lib/assets/icons/phone.png'),
                     _buildCardInformation('Contraseña', '*********',
                         'lib/assets/icons/password.png'),
+                    _buildCardInformation(
+                        'Licencia', _licencia, 'lib/assets/icons/miPerfil.png'),
                     SizedBox(
                         height:
                             10), // Espacio adicional entre las cards y el botón
@@ -345,32 +353,32 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
     );
   }
 
-  Widget _buildCardInformation(String title, String value, String pathIcon) {
-    return Container(
-      width: MediaQuery.of(context).size.width *
-          0.89, // Define el ancho de la card como la mitad de la pantalla
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: Color(0xFFDCDCDC)),
-        ),
-        color: Colors.white,
-        elevation: 0,
-        child: Padding(
-          padding: EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Color(0xFFF5F4F9),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Image.asset(pathIcon),
+Widget _buildCardInformation(String title, String value, String pathIcon) {
+  return Container(
+    width: MediaQuery.of(context).size.width * 0.89,
+    child: Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Color(0xFFDCDCDC)),
+      ),
+      color: Colors.white,
+      elevation: 0,
+      child: Padding(
+        padding: EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Color(0xFFF5F4F9),
+                borderRadius: BorderRadius.circular(10),
               ),
-              SizedBox(width: 16),
-              Column(
+              child: Image.asset(pathIcon),
+            ),
+            SizedBox(width: 16),
+            Expanded( // Usar Expanded para distribuir espacio disponible
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -381,20 +389,25 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                  SizedBox(height: 8), // Espacio entre hora y fecha
+                  SizedBox(height: 8),
                   Text(
-                    value,
+                    value.length > 28 ? '${value.substring(0, 25)}...' : value,
                     style: TextStyle(
                       color: Color(0xFF2F2F2F),
                       fontSize: 14,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+
 }

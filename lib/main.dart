@@ -299,7 +299,7 @@ void onStart(ServiceInstance service) async {
   final String _numElemento = prefs.getString('NumeroElemento')!;
 
   
-    final VolumeService volumeService = VolumeService(); // Inicializar VolumeService
+    final VolumeService volumeService = VolumeService(_numElemento, _tel); // Inicializar VolumeService
 
 
 

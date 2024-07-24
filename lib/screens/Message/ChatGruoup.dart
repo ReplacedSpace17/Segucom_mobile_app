@@ -580,129 +580,131 @@ void _handleReceivedMessage(dynamic data) {
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundImage: AssetImage('lib/assets/icons/contact.png'),
-              radius: 20,
-            ),
-            SizedBox(width: 10),
-Expanded(
-  child: Text(
-    '${widget.chatData["NOMBRE_COMPLETO"]}',
-    style: TextStyle(fontSize: 18),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    textAlign: TextAlign.start, // Ajusta esto según tus necesidades
-  ),
-),
-          ],
-        ),
-      ),
-      body: Column(
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Row(
         children: [
-          Expanded(
-            child: messages.isEmpty
-                ? Center(child: Text('Aún no hay mensajes, envía el primero!'))
-                : ListView.builder(
-                    controller: _scrollController,
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      var message = messages[index];
-                      bool showDateSeparator = false;
-
-                      if (index == 0) {
-                        showDateSeparator = true;
-                      } else {
-                        String prevMessageDate =
-                            messages[index - 1]['FECHA'].split('T')[0];
-                        String currentMessageDate =
-                            message['FECHA'].split('T')[0];
-                        showDateSeparator =
-                            prevMessageDate != currentMessageDate;
-                      }
-
-                      return Column(
-                        children: [
-                          if (showDateSeparator)
-                            _buildDateSeparator(message['FECHA']),
-                          _buildMessage(message),
-                        ],
-                      );
-                    },
-                  ),
+          CircleAvatar(
+            backgroundImage: AssetImage('lib/assets/icons/contact.png'),
+            radius: 20,
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    onChanged: (value) {
-                      setState(() {
-                        isTyping = value.trim().isNotEmpty;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Escribe un mensaje...',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20.0),
-                        borderSide: BorderSide(
-                          color: Color.fromARGB(
-                              255, 17, 55, 95), // Color del borde
-                          width: 2.0, // Ancho del borde
-                        ),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                          vertical: 10.0, horizontal: 15.0),
-                      suffixIcon: IconButton(
-                        icon: Icon(Icons.photo),
-                        onPressed: _pickImage,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue,
-                  ),
-                  child: IconButton(
-                    icon: _isRecording
-                        ? Icon(Icons.stop)
-                        : (isTyping ? Icon(Icons.send) : Icon(Icons.mic)),
-                    onPressed: () {
-                      if (isTyping) {
-                        String message = messageController.text.trim();
-                        if (message.isNotEmpty) {
-                          sendMessage(message);
-                        }
-                      } else {
-                        if (_isRecording) {
-                          _stopRecording();
-                        } else {
-                          _startRecording();
-                        }
-                      }
-                    },
-                    color: Colors.white,
-                  ),
-                ),
-                // Botón para grabar audio
-              ],
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${widget.chatData["NOMBRE_COMPLETO"]}',
+              style: TextStyle(fontSize: 18),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.start,
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+    body: Column(
+      children: [
+        Expanded(
+          child: messages.isEmpty
+              ? Center(child: Text('Aún no hay mensajes, envía el primero!'))
+              : ListView.builder(
+                  controller: _scrollController,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    var message = messages[index];
+                    bool showDateSeparator = false;
+
+                    if (index == 0) {
+                      showDateSeparator = true;
+                    } else {
+                      String prevMessageDate =
+                          messages[index - 1]['FECHA'].split('T')[0];
+                      String currentMessageDate =
+                          message['FECHA'].split('T')[0];
+                      showDateSeparator =
+                          prevMessageDate != currentMessageDate;
+                    }
+
+                    return Column(
+                      children: [
+                        if (showDateSeparator)
+                          _buildDateSeparator(message['FECHA']),
+                        _buildMessage(message),
+                      ],
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: messageController,
+                  onChanged: (value) {
+                    setState(() {
+                      isTyping = value.trim().isNotEmpty;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Escribe un mensaje...',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20.0),
+                      borderSide: BorderSide(
+                        color: Color.fromARGB(
+                            255, 17, 55, 95), // Color del borde
+                        width: 2.0, // Ancho del borde
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                        vertical: 10.0, horizontal: 15.0),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.photo),
+                      onPressed: _pickImage,
+                    ),
+                  ),
+                  maxLines: null, // Permite múltiples líneas
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue,
+                ),
+                child: IconButton(
+                  icon: _isRecording
+                      ? Icon(Icons.stop)
+                      : (isTyping ? Icon(Icons.send) : Icon(Icons.mic)),
+                  onPressed: () {
+                    if (isTyping) {
+                      String message = messageController.text.trim();
+                      if (message.isNotEmpty) {
+                        sendMessage(message);
+                      }
+                    } else {
+                      if (_isRecording) {
+                        _stopRecording();
+                      } else {
+                        _startRecording();
+                      }
+                    }
+                  },
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 }
