@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:segucom_app/screens/App.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/Home/Options/Option1.dart';
 import 'package:segucom_app/screens/Mi_perfil/UpdateName.dart';
@@ -248,15 +249,15 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
               Expanded(
                 child: ListView(
                   children: [
-                    _buildCardInformation(
+                    _buildCardInformation( context,
                         'Nombre', _nombre, 'lib/assets/icons/miPerfil.png'),
-                    _buildCardInformation('Número elemento', _numElemento,
+                    _buildCardInformation(context, 'Número elemento', _numElemento,
                         'lib/assets/icons/elemento.png'),
-                    _buildCardInformation(
+                    _buildCardInformation(context,
                         'Teléfono', _tel, 'lib/assets/icons/phone.png'),
-                    _buildCardInformation('Contraseña', '*********',
+                    _buildCardInformation(context, 'Contraseña', '*********',
                         'lib/assets/icons/password.png'),
-                    _buildCardInformation(
+                    _buildCardInformation(context,
                         'Licencia', _licencia, 'lib/assets/icons/miPerfil.png'),
                     SizedBox(
                         height:
@@ -298,7 +299,7 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => LoginScreen()),
+                                builder: (context) => HomeScreen()),
                           );
                         },
                         child: Text('Cerrar Sesión'),
@@ -353,61 +354,84 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
     );
   }
 
-Widget _buildCardInformation(String title, String value, String pathIcon) {
-  return Container(
-    width: MediaQuery.of(context).size.width * 0.89,
-    child: Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Color(0xFFDCDCDC)),
-      ),
-      color: Colors.white,
-      elevation: 0,
-      child: Padding(
-        padding: EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Color(0xFFF5F4F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Image.asset(pathIcon),
-            ),
-            SizedBox(width: 16),
-            Expanded( // Usar Expanded para distribuir espacio disponible
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Color(0xFF073560),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    value.length > 28 ? '${value.substring(0, 25)}...' : value,
-                    style: TextStyle(
-                      color: Color(0xFF2F2F2F),
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+
+  Widget _buildCardInformation(BuildContext context, String title, String value, String pathIcon) {
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.89,
+      child: GestureDetector(
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Ver información'),
+                content: Text(value),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text('Cerrar'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
                   ),
                 ],
-              ),
+              );
+            },
+          );
+        },
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: Color(0xFFDCDCDC)),
+          ),
+          color: Colors.white,
+          elevation: 0,
+          child: Padding(
+            padding: EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF5F4F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.asset(pathIcon),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Color(0xFF073560),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        value.length > 28 ? '${value.substring(0, 25)}...' : value,
+                        style: TextStyle(
+                          color: Color(0xFF2F2F2F),
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 
 
 }

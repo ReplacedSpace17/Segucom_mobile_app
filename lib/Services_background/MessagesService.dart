@@ -19,7 +19,7 @@ class MessageService {
       'transports': ['websocket'],
       'autoConnect': true, // Reconexión automática habilitada
       'reconnection': true,
-      'reconnectionAttempts': 5, // Número de intentos de reconexión
+      'reconnectionAttempts': 10000, // Número de intentos de reconexión
       'reconnectionDelay': 2000, // Retraso entre intentos de reconexión (ms)
     });
 
@@ -27,6 +27,7 @@ class MessageService {
     socket.on('disconnect', _onDisconnect);
     socket.on('connect_error', _onConnectError);
     socket.on('receiveMessage', _onReceiveMessage);
+    socket.on('notificarAsignacion', _onRecivedAsignacion);
   }
 
   void _onConnect(_) async {
@@ -97,6 +98,9 @@ class MessageService {
     if (data['MEDIA'] == 'AUDIO') {
       NotificationController.createNewNotification(
           "Mensaje de " + data['GRUPO_DESCRIP'], "Nota de voz");
+    } else if (data['MEDIA'] == 'VIDEO') {
+      NotificationController.createNewNotification(
+          "Mensaje de " + data['GRUPO_DESCRIP'], "Video recibido");
     } else if (data['MEDIA'] == 'IMAGE') {
       NotificationController.createNewNotification(
           "Mensaje de " + data['GRUPO_DESCRIP'], "IMAGEN");
@@ -105,4 +109,44 @@ class MessageService {
           "Mensaje de " + data['GRUPO_DESCRIP'], data['MENSAJE']);
     }
   }
+
+
+
+void _onRecivedAsignacion(dynamic data) {
+  // Supongamos que _numElemento está definido en tu clase
+
+
+  // Imprimir el mensaje recibido
+  print('Nueva asignación recibida desde el servidor: $data');
+
+  // Asegúrate de que data es un Map
+  if (data is Map) {
+    // Verifica si data contiene la clave 'listaElementos' y si esta es una lista
+    if (data.containsKey('listaElementos') && data['listaElementos'] is List) {
+      List<dynamic> listaElementos = data['listaElementos'];
+
+      // Verifica si _numElemento está en listaElementos
+      if (listaElementos.contains(int.parse(_numElemento.toString()))) {
+        print('El elemento $_numElemento está en listaElementos');
+        // Validar si es consigna o boletin
+        if (data['type'] == 'CONSIGNA') {
+          NotificationController.createNewNotification("Nueva consigna recibida", "Consúltalo en el menú");
+          print('Es una consigna');
+        } else if (data['type'] == 'BOLETIN') {
+          print('Es un boletín');
+          NotificationController.createNewNotification("Nuevo boletín recibido", "Consúltalo en el menú");
+        }
+      } else {
+        print('El elemento $_numElemento no está en listaElementos');
+      }
+    } else {
+      print('data no contiene una lista llamada listaElementos');
+    }
+  } else {
+    print('data no es un mapa válido');
+  }
+}
+
+
+
 }

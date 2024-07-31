@@ -50,7 +50,6 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
 
   /// video
   VideoPlayerController? _videoController;
-  
 
   Future<void> _initialize() async {
     await _recorder.openRecorder();
@@ -277,46 +276,50 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     }
   }
 
-void _handleReceivedMessage(dynamic data) {
-  // Verificar si el mensaje pertenece al grupo actual
-  if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
-    var receivedMessage = {
-      'MENSAJE_ID': data['MENSAJE_ID'],
-      'FECHA': data['FECHA'],
-      'REMITENTE': data['REMITENTE'],
-      'MENSAJE': data['MENSAJE'],
-      'MEDIA': data['MEDIA'],
-      'UBICACION': data['UBICACION'],
-      'NOMBRE': data['NOMBRE'],
-    };
+  void _handleReceivedMessage(dynamic data) {
+    // Verificar si el mensaje pertenece al grupo actual
+    print('GRUPO_ID: ${data['GRUPO_ID']}');
+    print('ID GRUPO: ${widget.idGrupo}');
+    if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
+      var receivedMessage = {
+        'MENSAJE_ID': data['MENSAJE_ID'],
+        'FECHA': data['FECHA'],
+        'REMITENTE': data['REMITENTE'],
+        'MENSAJE': data['MENSAJE'],
+        'MEDIA': data['MEDIA'],
+        'UBICACION': data['UBICACION'],
+        'NOMBRE': data['NOMBRE'],
+      };
 
-    // Verificar si el mensaje ya existe en la lista de mensajes
-    bool messageExists = messages
-        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+      // Verificar si el mensaje ya existe en la lista de mensajes
+      bool messageExists = messages
+          .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
 
-    if (!messageExists) {
-      if (mounted) {
-        setState(() {
-          // Ajustar la URL completa del servidor
-          if (receivedMessage['MEDIA'] == 'IMAGE') {
-            receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-          }
-          if (receivedMessage['MEDIA'] == 'VIDEO') {
-            receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-          }
-          messages.add(receivedMessage);
-        });
+      if (!messageExists) {
+        if (mounted) {
+          setState(() {
+            if (receivedMessage['MEDIA'] == 'IMAGE') {
+              // Ajustar la URL completa del servidor
+              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+            }
+            if (receivedMessage['MEDIA'] == 'VIDEO') {
+              print("######################################3  recibido video");
+              // Ajustar la URL completa del servidor
+              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+            }
+            messages.add(receivedMessage);
+          });
 
-        // Desplazarse al final de la lista de mensajes
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _scrollToBottom());
+          // Desplazarse al final de la lista de mensajes
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
       }
+    } else {
+      print(
+          'Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
     }
-  } else {
-    print('Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
   }
-}
-
 
   Future<void> sendMessage(String message) async {
     var currentDate = DateTime.now();
@@ -542,191 +545,172 @@ void _handleReceivedMessage(dynamic data) {
     );
   }
 
-Widget _buildMessage(Map<String, dynamic> message) {
-  if (message == null) {
-    return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
-  }
+  Widget _buildMessage(Map<String, dynamic> message) {
+    if (message == null) {
+      return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
+    }
 
-  bool isMe = message['REMITENTE'].toString() == widget.numElemento;
-  bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
-  bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
-  bool isVideo = message.containsKey('MEDIA') && message['MEDIA'] == 'VIDEO';
-  String messageText = message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
-  String remitente = message['NOMBRE'] ?? '';
-  String fecha = message['FECHA'] ?? '';
+    bool isMe = message['REMITENTE'].toString() == widget.numElemento;
+    bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
+    bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
+    bool isVideo = message.containsKey('MEDIA') && message['MEDIA'] == 'VIDEO';
+    String messageText =
+        message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
+    String remitente = message['NOMBRE'] ?? '';
+    String fecha = message['FECHA'] ?? '';
 
-  return Align(
-    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isMe ? Colors.blueAccent : Colors.grey[300],
-        borderRadius: isMe
-            ? BorderRadius.only(
-                topLeft: Radius.circular(10),
-                bottomLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              )
-            : BorderRadius.only(
-                topRight: Radius.circular(10),
-                bottomRight: Radius.circular(10),
-                topLeft: Radius.circular(10),
-              ),
-      ),
-      child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (isMedia)
-            GestureDetector(
-              onTap: () {
-                // Mostrar la imagen en una vista emergente
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return Dialog(
-                      child: InteractiveViewer(
-                        child: Image.network(
-                          '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-                          fit: BoxFit.contain,
-                          width: double.infinity, // Ajusta el ancho
-                          height: 400, // Ajusta la altura
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-              child: Image.network(
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blueAccent : Colors.grey[300],
+          borderRadius: isMe
+              ? BorderRadius.only(
+                  topLeft: Radius.circular(10),
+                  bottomLeft: Radius.circular(10),
+                  topRight: Radius.circular(10),
+                )
+              : BorderRadius.only(
+                  topRight: Radius.circular(10),
+                  bottomRight: Radius.circular(10),
+                  topLeft: Radius.circular(10),
+                ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            if (isMedia)
+              Image.network(
                 '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
               ),
-            ),
-          if (isAudio)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black,
+            if (isAudio)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
+                  IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.stop : Icons.play_arrow,
+                      color: isMe ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () async {
+                      print(
+                          'REPRODUCIENDO DEEE:  ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
+                      if (_isPlaying) {
+                        await _stopPlaying();
+                      } else {
+                        margin:
+                        0;
+                        await _player.startPlayer(
+                          fromURI:
+                              '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                          whenFinished: () {
+                            setState(() {
+                              _isPlaying = false;
+                            });
+                          },
+                        );
+                        setState(() {
+                          _isPlaying = true;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            if (isVideo)
+              if (isVideo)
+                _buildVideoPlayer(
+                    '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                    200,
+                    200),
+
+            if (!isMedia && !isAudio && !isVideo)
+              Text(
+                messageText,
+                style: TextStyle(color: isMe ? Colors.white : Colors.black),
+              ),
+            SizedBox(height: 4),
+            Text(
+              fecha.isNotEmpty
+                  ? DateFormat('HH:mm').format(DateTime.parse(fecha))
+                  : '',
+              style: TextStyle(
+                  color: isMe ? Colors.white70 : Colors.black54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400),
+            ),
+            SizedBox(
+                height: 2), // Espacio entre el texto del mensaje y el remitente
+            Text(
+              remitente,
+              style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.black54,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoPlayer(String videoUrl, double width, double height) {
+    return FutureBuilder<void>(
+      future: _initializeVideoPlayer(videoUrl),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          // Obtener las dimensiones originales del video
+          final size = _videoController!.value.size;
+          double aspectRatio = size.width > 0 && size.height > 0
+              ? size.width / size.height
+              : 16 / 9; // Valor por defecto
+
+          return Container(
+            width: width,
+            height: height,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AspectRatio(
+                  aspectRatio: aspectRatio,
+                  child: VideoPlayer(_videoController!),
                 ),
                 IconButton(
                   icon: Icon(
-                    _isPlaying ? Icons.stop : Icons.play_arrow,
-                    color: isMe ? Colors.white : Colors.black,
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 64.0, // Tamaño del ícono
                   ),
-                  onPressed: () async {
-                    print(
-                        'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
-                    if (_isPlaying) {
-                      await _stopPlaying();
-                    } else {
-                      await _player.startPlayer(
-                        fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-                        whenFinished: () {
-                          setState(() {
-                            _isPlaying = false;
-                          });
-                        },
-                      );
-                      setState(() {
-                        _isPlaying = true;
-                      });
-                    }
+                  onPressed: () {
+                    // Reproducir el video al presionar el ícono
+                    _videoController!.play();
+                    _goFullScreen(
+                        context); // Llama a la función para ir a pantalla completa
                   },
                 ),
               ],
             ),
-          if (isVideo)
-            _buildVideoPlayer(
-              '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-              200,
-              200,
-            ),
-          if (!isMedia && !isAudio && !isVideo)
-            Text(
-              messageText,
-              style: TextStyle(color: isMe ? Colors.white : Colors.black),
-            ),
-          SizedBox(height: 4),
-          Text(
-            fecha.isNotEmpty
-                ? DateFormat('HH:mm').format(DateTime.parse(fecha))
-                : '',
-            style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.black54,
-                fontSize: 11,
-                fontWeight: FontWeight.w400),
-          ),
-          SizedBox(height: 2), // Espacio entre el texto del mensaje y el remitente
-          Text(
-            remitente,
-            style: TextStyle(
-              color: isMe ? Colors.white70 : Colors.black54,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-Widget _buildVideoPlayer(String videoUrl, double width, double height) {
-  // Verifica si el controlador ya está inicializado
-  if (_videoController == null) {
-    _videoController = VideoPlayerController.network(videoUrl)
-      ..initialize().then((_) {
-        setState(() {}); // Actualiza el estado una vez inicializado
-      });
+          );
+        } else {
+          return CircularProgressIndicator();
+        }
+      },
+    );
   }
-
-  return FutureBuilder<void>(
-    future: _videoController!.initialize(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.done) {
-        // Obtener las dimensiones originales del video
-        final size = _videoController!.value.size;
-        double aspectRatio = size.width > 0 && size.height > 0
-            ? size.width / size.height
-            : 16 / 9; // Valor por defecto
-
-        return Container(
-          width: width,
-          height: height,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AspectRatio(
-                aspectRatio: aspectRatio,
-                child: VideoPlayer(_videoController!),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 64.0, // Tamaño del ícono
-                ),
-                onPressed: () {
-                  // Reproducir el video al presionar el ícono
-                  _videoController!.play();
-                  _goFullScreen(context); // Llama a la función para ir a pantalla completa
-                },
-              ),
-            ],
-          ),
-        );
-      } else {
-        return CircularProgressIndicator();
-      }
-    },
-  );
-}
 
   void _goFullScreen(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(

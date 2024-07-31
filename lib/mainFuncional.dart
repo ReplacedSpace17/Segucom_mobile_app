@@ -55,23 +55,18 @@ Future<SecurityContext> initializeSecurityContext() async {
 */
 
 Future<void> main() async {
-  
-  
   WidgetsFlutterBinding.ensureInitialized();
-
 
   // Inicializa las notificaciones y el puerto de comunicación entre isolates
   await NotificationController.initializeLocalNotifications();
   await NotificationController.initializeIsolateReceivePort();
 
-  
-
   await initializeService();
-   await Geolocator.openLocationSettings();
+  await Geolocator.openLocationSettings();
   await Geolocator.requestPermission();
   await Geolocator.isLocationServiceEnabled();
 
-   await AwesomeNotifications().requestPermissionToSendNotifications();
+  await AwesomeNotifications().requestPermissionToSendNotifications();
 
   await Permission.microphone.request();
   await Permission.camera.request();
@@ -92,16 +87,26 @@ class SegucomApp extends StatefulWidget {
 }
 
 class _SegucomAppState extends State<SegucomApp> {
-
+  late CallingService _callingService;
 
   @override
   void initState() {
     //NotificationController.startListeningNotificationEvents();
-   
+
     // Inicializa el servicio de llamadas
-    
-   
-    
+    /*
+    _callingService = CallingService(
+      callerName: 'Nombre del Llamador',  // Asigna un nombre de llamador apropiado
+      callerNumber: 'Número del Llamador',  // Asigna un número de llamador apropiado
+      userElementNumber: '80100',  // El número de elemento del usuario actual
+    );
+     // Llama al método initialize para configurar el servicio
+    _callingService.initialize().then((_) {
+      // Puedes agregar lógica adicional aquí después de la inicialización, si es necesario
+    }).catchError((error) {
+      print('Error al inicializar CallingService: $error');
+    });
+    */
     super.initState();
   }
 
@@ -120,7 +125,7 @@ class _SegucomAppState extends State<SegucomApp> {
         '/login': (context) => LoginScreen(),
         '/configBackend': (context) => ConfigScreen(),
         '/register': (context) => RegisterScreen(),
-        '/config':(context) => HomeScreen(),
+        '/config': (context) => HomeScreen(),
         '/menu': (context) => MenuScreen(),
         '/notification-page': (context) => NotificationPage(
             receivedAction: NotificationController.initialAction!),
@@ -163,9 +168,7 @@ class _SplashScreenState extends State<SplashScreen> {
           final Map<String, dynamic> userData = jsonDecode(response.body);
           print('Datos del usuario: $userData');
           final String _numElemento = prefs.getString('NumeroElemento')!;
-
-            //final MessageService messageService = MessageService(_numElemento);
-
+          final MessageService messageService = MessageService(_numElemento);
           // Navegar al menú principal u otra pantalla segura
           Navigator.pushReplacementNamed(context, '/menu');
         } else {
@@ -237,7 +240,6 @@ class NotificationPage extends StatelessWidget {
   }
 }
 
-
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
 
@@ -276,56 +278,34 @@ Future<void> initializeService() async {
   );
 }
 
-
-
-
-
 @pragma('vm:entry-point')
 Future<bool> onIosBackground(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   return true;
 }
+
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  
   late IO.Socket socket;
   final UbicationService _ubicationService = UbicationService();
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? authToken = prefs.getString('authToken');
 
   final String _tel = prefs.getInt('NumeroTel').toString();
   final String _numElemento = prefs.getString('NumeroElemento')!;
 
-
-
-  NotificationController.startListeningNotificationEvents();
-    final VolumeService volumeService = VolumeService(_numElemento, _tel); // Inicializar VolumeService
-final MessageService messageService = MessageService(_numElemento);
-
+  final VolumeService volumeService =
+      VolumeService(_numElemento, _tel); // Inicializar VolumeService
+  final MessageService messageService = MessageService(_numElemento);
 
   if (authToken != null) {
 //INICIA EL SERVICIO DE MENSAJES
 // INICIA AQUI EL BTON DE PANICO
-    
+    NotificationController.startListeningNotificationEvents();
     //INICIA EL SERVICIO DE UBICACION
-
-/*
- _callingService = CallingService(
-      callerName: 'Nombre del Llamador',  // Asigna un nombre de llamador apropiado
-      callerNumber: _tel,  // Asigna un número de llamador apropiado
-      userElementNumber: _numElemento,  // El número de elemento del usuario actual
-    );
-     // Llama al método initialize para configurar el servicio
-    _callingService.initialize().then((_) {
-      // Puedes agregar lógica adicional aquí después de la inicialización, si es necesario
-    }).catchError((error) {
-      print('Error al inicializar CallingService: $error');
-    });
-
-*/
-    
     Timer.periodic(const Duration(minutes: 10), (timer) async {
       if (service is AndroidServiceInstance) {
         if (await service.isForegroundService()) {
@@ -337,4 +317,3 @@ final MessageService messageService = MessageService(_numElemento);
     });
   }
 }
-

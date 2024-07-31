@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:segucom_app/screens/Home/Options/Option1.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatelessWidget {
   @override
@@ -84,6 +86,31 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                   SizedBox(height: 10),
+GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WebViewScreen(
+          url: 'https://segucom.mx/policy.html',
+          title: 'Política de privacidad',
+        ),
+      ),
+    );
+  },
+  child: Text(
+    'Aviso de privacidad',
+    style: TextStyle(
+      fontWeight: FontWeight.w300, // Letra light
+      color: Color(0xFF073560),
+      fontSize: 15,
+      decoration: TextDecoration.underline, // Opción para subrayar el texto
+    ),
+  ),
+),
+
+
                     // Botón de backend
                     
                   ],

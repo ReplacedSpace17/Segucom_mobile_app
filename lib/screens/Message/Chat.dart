@@ -799,101 +799,119 @@ void _handleReceivedMessage(dynamic data) {
     );
   }
 
-  Widget _buildMessage(Map<String, dynamic> message) {
-    bool isMe = message['REMITENTE'].toString() == widget.numElemento;
-    bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
-    bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
-    String messageText = message['MENSAJE'];
+Widget _buildMessage(Map<String, dynamic> message) {
+  bool isMe = message['REMITENTE'].toString() == widget.numElemento;
+  bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
+  bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
+  String messageText = message['MENSAJE'];
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.blueAccent : Colors.grey[300],
-          borderRadius: isMe
-              ? BorderRadius.only(
-                  topLeft: Radius.circular(10),
-                  bottomLeft: Radius.circular(10),
-                  topRight: Radius.circular(10),
-                )
-              : BorderRadius.only(
-                  topRight: Radius.circular(10),
-                  bottomRight: Radius.circular(10),
-                  topLeft: Radius.circular(10),
-                ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            if (isMedia)
-              Image.network(
+  return Align(
+    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+    child: Container(
+      margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
+      padding: EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isMe ? Colors.blueAccent : Colors.grey[300],
+        borderRadius: isMe
+            ? BorderRadius.only(
+                topLeft: Radius.circular(10),
+                bottomLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              )
+            : BorderRadius.only(
+                topRight: Radius.circular(10),
+                bottomRight: Radius.circular(10),
+                topLeft: Radius.circular(10),
+              ),
+      ),
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (isMedia)
+            GestureDetector(
+              onTap: () {
+                // Mostrar la imagen en una vista emergente
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return Dialog(
+                      child: InteractiveViewer(
+                        child: Image.network(
+                          '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                          fit: BoxFit.contain,
+                          width: double.infinity, // Ajusta el ancho
+                          height: 400, // Ajusta la altura
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              child: Image.network(
                 '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                 width: 200,
                 height: 200,
                 fit: BoxFit.cover,
               ),
-            if (isAudio)
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
-                      style: TextStyle(
-                        color: isMe ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      _isPlaying ? Icons.stop : Icons.play_arrow,
+            ),
+          if (isAudio)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
+                    style: TextStyle(
                       color: isMe ? Colors.white : Colors.black,
                     ),
-                    onPressed: () async {
-                      if (_isPlaying) {
-                        await _stopPlaying();
-                      } else {
-                        // Reproducir el audio
-                        print(
-                            'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
-                        await _player.startPlayer(
-                          fromURI:
-                              '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
-                          whenFinished: () {
-                            setState(() {
-                              _isPlaying = false;
-                            });
-                          },
-                        );
-                        setState(() {
-                          _isPlaying = true;
-                        });
-                      }
-                    },
                   ),
-                ],
-              ),
-            if (!isMedia && !isAudio)
-              Text(
-                messageText,
-                style: TextStyle(color: isMe ? Colors.white : Colors.black),
-              ),
-            SizedBox(height: 4),
-            Text(
-              DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
-              style: TextStyle(
-                  color: isMe ? Colors.white70 : Colors.black54,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400),
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isPlaying ? Icons.stop : Icons.play_arrow,
+                    color: isMe ? Colors.white : Colors.black,
+                  ),
+                  onPressed: () async {
+                    if (_isPlaying) {
+                      await _stopPlaying();
+                    } else {
+                      // Reproducir el audio
+                      print(
+                          'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
+                      await _player.startPlayer(
+                        fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                        whenFinished: () {
+                          setState(() {
+                            _isPlaying = false;
+                          });
+                        },
+                      );
+                      setState(() {
+                        _isPlaying = true;
+                      });
+                    }
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
+          if (!isMedia && !isAudio)
+            Text(
+              messageText,
+              style: TextStyle(color: isMe ? Colors.white : Colors.black),
+            ),
+          SizedBox(height: 4),
+          Text(
+            DateFormat('HH:mm').format(DateTime.parse(message['FECHA'])),
+            style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.black54,
+                fontSize: 11,
+                fontWeight: FontWeight.w400),
+          ),
+        ],
       ),
-    );
-  }
-
+    ),
+  );
+}
+  
   Widget _buildDateSeparator(String date) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),

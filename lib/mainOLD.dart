@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/Services_background/CallingService.dart';
 import 'package:segucom_app/Services_background/MessagesService.dart';
 import 'package:segucom_app/Services_background/VolumeService.dart';
@@ -59,7 +58,6 @@ Future<void> main() async {
   
   WidgetsFlutterBinding.ensureInitialized();
 
-
   // Inicializa las notificaciones y el puerto de comunicación entre isolates
   await NotificationController.initializeLocalNotifications();
   await NotificationController.initializeIsolateReceivePort();
@@ -70,11 +68,6 @@ Future<void> main() async {
    await Geolocator.openLocationSettings();
   await Geolocator.requestPermission();
   await Geolocator.isLocationServiceEnabled();
-
-   await AwesomeNotifications().requestPermissionToSendNotifications();
-
-  await Permission.microphone.request();
-  await Permission.camera.request();
   //SecurityContext securityContext = await initializeSecurityContext();
   //HttpOverrides.global = MyHttpOverrides(securityContext);
   runApp(SegucomApp());
@@ -288,7 +281,6 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 }
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  
   late IO.Socket socket;
   final UbicationService _ubicationService = UbicationService();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -300,15 +292,14 @@ void onStart(ServiceInstance service) async {
 
 
 
-  NotificationController.startListeningNotificationEvents();
-    final VolumeService volumeService = VolumeService(_numElemento, _tel); // Inicializar VolumeService
-final MessageService messageService = MessageService(_numElemento);
 
 
   if (authToken != null) {
 //INICIA EL SERVICIO DE MENSAJES
 // INICIA AQUI EL BTON DE PANICO
-    
+      NotificationController.startListeningNotificationEvents();
+    final VolumeService volumeService = VolumeService(_numElemento, _tel); // Inicializar VolumeService
+final MessageService messageService = MessageService(_numElemento);
     //INICIA EL SERVICIO DE UBICACION
 
 /*

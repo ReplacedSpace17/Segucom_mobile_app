@@ -92,8 +92,7 @@ class _MenuScreenState extends State<MenuScreen> {
           _numConsignas.toString() +
           " Boletines: " +
           _numBoletines.toString();
-      NotificationController.createNewNotification(
-          "Resumen de asignaciones", mensaje);
+      //NotificationController.createNewNotification("Resumen de asignaciones", mensaje);
     } else {
       print('Error al enviar ubicación: ${response.statusCode}');
     }

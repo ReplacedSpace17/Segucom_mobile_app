@@ -73,6 +73,10 @@ class CallingService {
 
     _socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
+       'autoConnect': true, // Reconexión automática habilitada
+      'reconnection': true,
+      'reconnectionAttempts': 10000, // Número de intentos de reconexión
+      'reconnectionDelay': 2000, // Retraso entre intentos de reconexión (ms)
     });
 
     _socket?.on('connect', _onConnect);
