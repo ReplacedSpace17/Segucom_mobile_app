@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -128,7 +129,7 @@ class _SegucomAppState extends State<SegucomApp> {
         '/menu': (context) => MenuScreen(),
         '/notification-page': (context) => NotificationPage(
             receivedAction: NotificationController.initialAction!),
-            '/permision': (context) => RequestPermissionScreen(),
+        '/permision': (context) => RequestPermissionScreen(),
       },
     );
   }
@@ -146,74 +147,95 @@ class _SplashScreenState extends State<SplashScreen> {
     _autoLogin();
   }
 
-  Future<void> _autoLogin() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String? authToken = prefs.getString('authToken');
-    final String? permisionApp = prefs.getString('configPermissions');
+Future<String?> fetchAndroidID(String numeroElemento) async {
+  final url = Uri.parse('${ConfigBackend.backendUrl}/segucom/api/user/android/$numeroElemento');
+  print('URL: $url');
 
-    final String _tel = prefs.getInt('NumeroTel').toString();
-    print("VALOR DE PERMISOS: " + permisionApp.toString());
-    print("VALOR DE TOKEN: " + authToken.toString());
+  try {
+    final response = await http.get(url);
 
-    if (authToken != null) {
-      final url =
-          Uri.parse(ConfigBackend.backendUrl + '/segucom/api/data-protegida');
+    if (response.statusCode == 200) {
+      // Si la respuesta es exitosa, parsear el JSON
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      final String androidID = data['androidID'];
+      print('Android ID obtenido: $androidID');
+      return androidID; // Devuelve el androidID
+    } else if (response.statusCode == 404) {
+      print('Error: Número de teléfono no encontrado');
+      return null; // Retorna null si no se encuentra
+    } else {
+      print('Error al obtener el Android ID: ${response.statusCode}');
+      return null; // Retorna null en otros casos de error
+    }
+  } catch (e) {
+    print('Error al realizar la solicitud: $e');
+    return null; // Retorna null en caso de excepción
+  }
+}
 
-      try {
-        final response = await http.get(
-          url,
-          headers: {
-            'Authorization': authToken,
-            'Content-Type': 'application/json',
-          },
-        );
+Future<void> _autoLogin() async {
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final String? authToken = prefs.getString('authToken');
+  final String? permisionApp = prefs.getString('configPermissions');
+  DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
 
-        if (response.statusCode == 200) {
+  final String _tel = prefs.getInt('NumeroTel').toString();
+  print("VALOR DE PERMISOS: $permisionApp");
+  print("VALOR DE TOKEN: $authToken");
+
+  if (authToken != null) {
+    final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/data-protegida');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': authToken,
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Obtener el androidID permitido
+        String? androidIDPermitido = await fetchAndroidID(_tel);
+        String androidIDActual = androidInfo.id;
+
+        // Comparar el androidID permitido con el actual
+        if (androidIDPermitido == androidIDActual) {
           // Si la respuesta es exitosa, puedes procesar los datos aquí
           final Map<String, dynamic> userData = jsonDecode(response.body);
           print('Datos del usuario: $userData');
           final String _numElemento = prefs.getString('NumeroElemento')!;
 
           if (permisionApp != null) {
-          // await initializeService();
-           // final MessageService messageService = MessageService(_numElemento);
+            await initializeService();
             Navigator.pushReplacementNamed(context, '/menu');
-            
           } else {
-            // Navega a HomeScreen sin usar Navigator
-           Navigator.pushReplacementNamed(context, '/permision');
+            Navigator.pushReplacementNamed(context, '/permision');
           }
         } else {
-          print("############## valor de response.statusCode: " +
-              response.statusCode.toString());
-          print(permisionApp);
-          // Navega a HomeScreen sin usar Navigator
-          /*
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                  builder: (context) => RequestPermissionScreen()),
-            );
-          */
+          Navigator.pushReplacementNamed(context, '/login');
         }
-      } catch (e) {
-        print('Error en la solicitud HTTP:' + e.toString());
-        // Manejar errores de conexión u otros errores aquí
-        Navigator.pushReplacementNamed(context, '/config');
+      } else {
+        Navigator.pushReplacementNamed(context, '/login');
+        print("############## valor de response.statusCode: ${response.statusCode}");
+        print(permisionApp);
       }
-    } else {
-      //si no hay un token aun
-      if(permisionApp == null){
-        Navigator.pushReplacementNamed(context, '/permision');
-      }
-      else{
-        //que si tiene permisos
-        Navigator.pushReplacementNamed(context, '/config');
-      }
-      // No hay token guardado, navegar a la pantalla de inicio de sesión
-      //Navigator.pushReplacementNamed(context, '/config');
+    } catch (e) {
+      print('Error en la solicitud HTTP: $e');
+      Navigator.pushReplacementNamed(context, '/config');
     }
-    
+  } else {
+    // Si no hay un token aún
+    if (permisionApp == null) {
+      Navigator.pushReplacementNamed(context, '/permision');
+    } else {
+      Navigator.pushReplacementNamed(context, '/config');
+    }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +290,7 @@ class NotificationPage extends StatelessWidget {
     );
   }
 }
+
 /*
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
@@ -321,7 +344,7 @@ void onStart(ServiceInstance service) async {
 
   if (service is AndroidServiceInstance) {
     service.setAsForegroundService();
-    
+
     service.setForegroundNotificationInfo(
       title: 'SEGUCOM SERVICE',
       content: 'Service is running in the background',
@@ -332,9 +355,11 @@ void onStart(ServiceInstance service) async {
   final UbicationService _ubicationService = UbicationService();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  
-  await NotificationController.initializeLocalNotifications(); // Asegúrate de inicializar aquí
-  await _createNotificationChannel(flutterLocalNotificationsPlugin); // Crea el canal aquí
+
+  await NotificationController
+      .initializeLocalNotifications(); // Asegúrate de inicializar aquí
+  await _createNotificationChannel(
+      flutterLocalNotificationsPlugin); // Crea el canal aquí
 
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? authToken = prefs.getString('authToken');
@@ -344,17 +369,17 @@ void onStart(ServiceInstance service) async {
   NotificationController.startListeningNotificationEvents();
 
   final VolumeService volumeService = VolumeService(_numElemento, _tel);
-  
+
   if (authToken != null) {
     final MessageService messageService = MessageService(_numElemento);
-    
-    Timer.periodic(const Duration(minutes: 1), (timer) async {
-      if (service is AndroidServiceInstance && await service.isForegroundService()) {
+
+    Timer.periodic(const Duration(minutes: 10), (timer) async {
+      if (service is AndroidServiceInstance &&
+          await service.isForegroundService()) {
         // Configurar la notificación en primer plano
- 
+
         try {
-         
-         await _ubicationService.sendLocation("", _tel, _numElemento);
+          await _ubicationService.sendLocation("", _tel, _numElemento);
         } catch (e) {
           print("Error al enviar ubicación: $e");
         }
@@ -384,7 +409,8 @@ Future<void> _createNotificationChannel(
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'my_foreground', // id del canal
     'MY FOREGROUND SERVICE', // nombre del canal
-    description: 'This channel is used for important notifications.', // descripción
+    description:
+        'This channel is used for important notifications.', // descripción
     importance: Importance.high,
   );
 
@@ -395,10 +421,8 @@ Future<void> _createNotificationChannel(
       ?.createNotificationChannel(channel);
 }
 
-
 Future<void> initializeService() async {
-
-   await requestPermissions(); // Solicita permisos primero
+  await requestPermissions(); // Solicita permisos primero
 
   final service = FlutterBackgroundService();
 

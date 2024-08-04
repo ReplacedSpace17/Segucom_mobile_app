@@ -1,5 +1,7 @@
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:segucom_app/screens/UpdateAndroidID/UpdateIDAndroid.dart';
 import 'dart:convert';
 import '../../configBackend.dart';
 import '../Home/Home_menu.dart';
@@ -61,8 +63,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return currentTime - lastAttemptTime < lockoutDuration * 1000;
   }
 
- Future<void> _loginUser(String phone, String password) async {
+Future<void> _loginUser(String phone, String password) async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
+  DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+
   final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/login');
   print('URL: $url');
   final response = await http.post(
@@ -73,9 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
     body: jsonEncode({
       "telefono": phone,
       "clave": password,
+      "androidID": androidInfo.id
     }),
   );
 
+  print("Validando " + androidInfo.id);
+  
   if (response.statusCode == 200) {
     // Parsear la respuesta JSON
     final Map<String, dynamic> userData = jsonDecode(response.body);
@@ -92,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
     prefs.setInt('NumeroTel', telefono);
     prefs.setString('Name', nombre);
     prefs.setString('NumeroElemento', elementoNum);
+    prefs.setString('AndroidID', androidInfo.id);
 
     // Inicio de sesión exitoso
     print('Inicio de sesión exitoso');
@@ -109,36 +118,48 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(builder: (context) => MenuScreen()),
     );
-  } else if (response.statusCode == 403) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Usuario inactivo'),
-        duration: Duration(seconds: 3), // Duración del snackbar
-        backgroundColor: Colors.red, // Color de fondo del snackbar
-      ),
-    );
   } else {
-    // Incrementar los intentos fallidos
-    await _incrementLoginAttempts();
-    if (loginAttempts >= maxAttempts) {
-      _showErrorSnackBar(
-          'Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
-      // Aquí puedes agregar la lógica adicional para bloquear la app
+    // Obtener el mensaje de error del cuerpo de la respuesta
+    String errorMessage = 'Ocurrió un error. Intente nuevamente.';
+    if (response.body.isNotEmpty) {
+      final Map<String, dynamic> errorData = jsonDecode(response.body);
+      errorMessage = errorData['error'] ?? errorMessage; // Usa el mensaje del servidor o uno por defecto
+    }
+
+    // Manejar los diferentes códigos de estado
+    if (response.statusCode == 403) {
+      _showErrorSnackBar(errorMessage); // Usa el mensaje del servidor
     } else {
-      if (response.statusCode == 401) {
+      // Incrementar los intentos fallidos
+      await _incrementLoginAttempts();
+      if (loginAttempts >= maxAttempts) {
         _showErrorSnackBar(
-            'Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
+            'Aplicación bloqueada después de 3 intentos fallidos. Espere 5 minutos');
+        // Aquí puedes agregar la lógica adicional para bloquear la app
+      } else {
+        if (response.statusCode == 401) {
+          _showErrorSnackBar(
+              'Credenciales incorrectas. Intento ${loginAttempts + 1} de $maxAttempts');
+        } else {
+          // Para otros códigos de error, muestra un mensaje genérico
+          _showErrorSnackBar(errorMessage);
+        }
       }
     }
   }
 }
+
+// Función para mostrar un Snackbar con el mensaje de error
 void _showErrorSnackBar(String message) {
-    final snackBar = SnackBar(
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
       content: Text(message),
+      duration: Duration(seconds: 3),
       backgroundColor: Colors.red,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  }
+    ),
+  );
+}
+
 
   Future<void> _onLoginButtonPressed() async {
     if (await _isLockedOut()) {
@@ -157,8 +178,6 @@ void _showErrorSnackBar(String message) {
 
 @override
 Widget build(BuildContext context) {
-  final double screenHeight = MediaQuery.of(context).size.height;
-
   return Scaffold(
     resizeToAvoidBottomInset: true,
     body: Stack(
@@ -197,130 +216,156 @@ Widget build(BuildContext context) {
               ),
               // Espacio adicional para que el contenido se visualice mejor
               SizedBox(height: 20),
-              Container(
-                height: screenHeight * 0.70,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(50.0),
-                  ),
-                  child: Container(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Center(
-                            child: Text(
-                              'Acceso',
+              ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(50.0),
+                ),
+                child: Container(
+                  color: Colors.white,
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Center(
+                          child: Text(
+                            'Acceso',
+                            style: TextStyle(
+                              fontSize: 24.0,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0B416C),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        // Campo de teléfono
+                        _buildTextField(
+                          controller: phoneController,
+                          label: 'Número de teléfono',
+                          icon: Icons.phone,
+                          inputType: TextInputType.phone,
+                        ),
+                        SizedBox(height: 20),
+                        // Campo de contraseña
+                        _buildTextField(
+                          controller: passwordController,
+                          label: 'Contraseña',
+                          icon: Icons.lock,
+                          obscureText: !showPassword,
+                        ),
+                        SizedBox(height: 20),
+                        Center(
+                          child: Text(
+                            'Máximo 3 intentos',
+                            style: TextStyle(
+                              fontSize: 16.0,
+                              color: Color(0xFF616161),
+                            ),
+                          ),
+                        ),
+                        // Checkbox para mantener la sesión iniciada
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: keepLoggedIn,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  keepLoggedIn = value ?? false;
+                                });
+                              },
+                              activeColor: Color(0xFF0B416C),
+                            ),
+                            Text(
+                              'Mantener la sesión iniciada',
                               style: TextStyle(
-                                fontSize: 24.0,
-                                fontWeight: FontWeight.bold,
                                 color: Color(0xFF0B416C),
                               ),
                             ),
-                          ),
-                          SizedBox(height: 20),
-                          // Campo de teléfono
-                          _buildTextField(
-                            controller: phoneController,
-                            label: 'Número de teléfono',
-                            icon: Icons.phone,
-                            inputType: TextInputType.phone,
-                          ),
-                          SizedBox(height: 20),
-                          // Campo de contraseña
-                          _buildTextField(
-                            controller: passwordController,
-                            label: 'Contraseña',
-                            icon: Icons.lock,
-                            obscureText: !showPassword,
-                          ),
-                          SizedBox(height: 20),
-                          Center(
+                          ],
+                        ),
+                        SizedBox(height: 20), // Añadir espacio entre checkbox y botones
+                        // Botón de inicio de sesión
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF073560),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                            ),
+                            onPressed: _onLoginButtonPressed,
                             child: Text(
-                              'Máximo 3 intentos',
+                              'INICIAR SESIÓN',
                               style: TextStyle(
-                                fontSize: 16.0,
-                                color: Color(0xFF616161),
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                fontSize: 15,
                               ),
                             ),
                           ),
-                          // Checkbox para mantener la sesión iniciada
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: keepLoggedIn,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    keepLoggedIn = value ?? false;
-                                  });
-                                },
-                                activeColor: Color(0xFF0B416C),
+                        ),
+                        // Botón para crear cuenta
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF073560),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.0),
                               ),
-                              Text(
-                                'Mantener la sesión iniciada',
-                                style: TextStyle(
-                                  color: Color(0xFF0B416C),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Spacer(), // Empuja los botones hacia abajo
-                          // Botón de inicio de sesión
-                          Container(
-                            margin: EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 10),
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF073560),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                padding: EdgeInsets.symmetric(vertical: 16.0),
-                              ),
-                              onPressed: _onLoginButtonPressed,
-                              child: Text(
-                                'INICIAR SESIÓN',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                ),
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                            ),
+                            onPressed: () {
+                              // Navegar a la pantalla de registro
+                              Navigator.pushNamed(context, '/register');
+                            },
+                            child: Text(
+                              'Crear cuenta',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                fontSize: 15,
                               ),
                             ),
                           ),
-                          // Botón para crear cuenta
-                          Container(
-                            margin: EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 10),
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF073560),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                        ),
+                        // Botón para solicitud de cambio de Android ID
+                        Container(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF073560),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.0),
                               ),
-                              onPressed: () {
-                                // Navegar a la pantalla de registro
-                                Navigator.pushNamed(context, '/register');
-                              },
-                              child: Text(
-                                'Crear cuenta',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                ),
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                            ),
+                            onPressed: () {
+                              // Navegar a la pantalla de solicitud de cambio de Android ID
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => UpdateAndroidIDScreen()),
+                              );
+                            },
+                            child: Text(
+                              'Solicitud de cambio del Android ID',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                fontSize: 15,
                               ),
                             ),
                           ),
-                          SizedBox(height: 20),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
