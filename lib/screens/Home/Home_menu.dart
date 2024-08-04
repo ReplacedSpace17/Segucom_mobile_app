@@ -59,6 +59,7 @@ class _MenuScreenState extends State<MenuScreen> {
     _loadNumElemento();
     //obtener notificaciones
     //obtener notificaciones
+    obtenerNombreCompleto();
     _getNotifications();
 
     // Iniciar el listener para cambios en el volumen
@@ -67,6 +68,31 @@ class _MenuScreenState extends State<MenuScreen> {
     // Configurar el listener para cambios en el volumen
     
   }
+
+Future<void> obtenerNombreCompleto() async {
+  // Obtiene la instancia de SharedPreferences
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  
+  // Recupera el número de teléfono
+  final String _tel = prefs.getInt('NumeroTel').toString();
+  
+  // Crea la URL
+  final urlNombre = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/user/nombre/$_tel');
+
+  // Realiza la solicitud HTTP
+  final nombreResponse = await http.get(urlNombre);
+
+  if (nombreResponse.statusCode == 200) {
+    final Map<String, dynamic> nombreData = jsonDecode(nombreResponse.body);
+    final String nombreCompleto = nombreData['nombreCompleto'];
+  print("NOMBRE BD:" +nombreCompleto);
+    // Almacena el nombre completo en SharedPreferences
+    await prefs.setString('NombreBD', nombreCompleto);
+  } else {
+    // Manejo de errores, puedes lanzar una excepción o imprimir un mensaje
+    throw Exception('Error al obtener el nombre: ${nombreResponse.statusCode}');
+  }
+}
 
   Future<void> _getNotifications() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

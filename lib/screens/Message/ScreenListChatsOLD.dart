@@ -30,8 +30,8 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-late Future<List<dynamic>> futureChats = Future.value([]);
-late Future<List<dynamic>> futureChatsGroups = Future.value([]);
+  late Future<List<dynamic>> futureChats;
+  late Future<List<dynamic>> futureChatsGroups;
   String _numElemento = '';
 
   @override
@@ -52,31 +52,29 @@ late Future<List<dynamic>> futureChatsGroups = Future.value([]);
     });
   }
 
- Future<List<dynamic>> fetchChats() async {
-  if (_numElemento.isEmpty) {
-    throw Exception('Número de elemento no cargado');
+  Future<List<dynamic>> fetchChats() async {
+    if (_numElemento.isEmpty) {
+      throw Exception('Número de elemento no cargado');
+    }
+
+    final response = await http.get(Uri.parse(
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/$_numElemento'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data
+          .map((chat) => {
+                'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
+                'NOMBRE_COMPLETO': chat['NOMBRE_COMPLETO'],
+                'ULTIMO_MENSAJE': chat['MENSAJES'].isNotEmpty
+                    ? chat['MENSAJES'].last['VALUE']
+                    : 'No hay mensajes'
+              })
+          .toList();
+    } else {
+      throw Exception('Failed to load chats');
+    }
   }
-
-  final response = await http.get(Uri.parse(
-      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/$_numElemento'));
-
-  if (response.statusCode == 200) {
-    List<dynamic> data = json.decode(response.body);
-    print(data);
-    return data
-        .map((chat) => {
-              'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
-              'NOMBRE_COMPLETO': chat['NOMBRE_COMPLETO'],
-              'ULTIMO_MENSAJE': chat['MENSAJES'].isNotEmpty
-                  ? chat['MENSAJES'].last['MENSAJE'] // Aquí obtenemos el último mensaje
-                  : 'No hay mensajes'
-            })
-        .toList();
-  } else {
-    throw Exception('Failed to load chats');
-  }
-}
-
 
   Future<List<dynamic>> fetchChatsGroups() async {
     if (_numElemento.isEmpty) {

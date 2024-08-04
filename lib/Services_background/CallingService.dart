@@ -62,6 +62,9 @@ class CallingService {
         _userElementNumber = userElementNumber;
 
   Future<void> initialize() async {
+     // Verificar permisos antes de abrir el grabador y el reproductor
+  await checkPermissions();
+  
     _recorder = FlutterSoundRecorder();
     _player = FlutterSoundPlayer();
     _flutterFFmpeg = FlutterFFmpeg();
@@ -101,6 +104,27 @@ class CallingService {
     ];
   }
 
+Future<void> checkPermissions() async {
+  // Verificar el estado del permiso de cámara
+  PermissionStatus cameraStatus = await Permission.camera.status;
+  if (cameraStatus.isDenied) {
+    print('Permiso de cámara denegado');
+  } else if (cameraStatus.isGranted) {
+    print('Permiso de cámara concedido');
+  } else if (cameraStatus.isPermanentlyDenied) {
+    print('Permiso de cámara permanentemente denegado. Solicita al usuario que habilite el permiso en la configuración.');
+  }
+
+  // Verificar el estado del permiso de micrófono
+  PermissionStatus microphoneStatus = await Permission.microphone.status;
+  if (microphoneStatus.isDenied) {
+    print('Permiso de micrófono denegado');
+  } else if (microphoneStatus.isGranted) {
+    print('Permiso de micrófono concedido');
+  } else if (microphoneStatus.isPermanentlyDenied) {
+    print('Permiso de micrófono permanentemente denegado. Solicita al usuario que habilite el permiso en la configuración.');
+  }
+}
   Future<void> _getMediaDevices() async {
     try {
       final devices = await navigator.mediaDevices.enumerateDevices();

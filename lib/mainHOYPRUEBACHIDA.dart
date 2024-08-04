@@ -58,17 +58,22 @@ Future<SecurityContext> initializeSecurityContext() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await AwesomeNotifications().requestPermissionToSendNotifications();
   // Inicializa las notificaciones y el puerto de comunicación entre isolates
   await NotificationController.initializeLocalNotifications();
   await NotificationController.initializeIsolateReceivePort();
 
-  //await Geolocator.openLocationSettings();
-  //await Geolocator.requestPermission();
-  //await Geolocator.isLocationServiceEnabled();
+  await initializeService();
 
-  //await Permission.microphone.request();
-  //await Permission.camera.request();
+  /*
+   await Geolocator.openLocationSettings();
+  await Geolocator.requestPermission();
+  await Geolocator.isLocationServiceEnabled();
+
+   await AwesomeNotifications().requestPermissionToSendNotifications();
+
+  await Permission.microphone.request();
+  await Permission.camera.request();
+  */
   //SecurityContext securityContext = await initializeSecurityContext();
   //HttpOverrides.global = MyHttpOverrides(securityContext);
   runApp(SegucomApp());
@@ -86,26 +91,12 @@ class SegucomApp extends StatefulWidget {
 }
 
 class _SegucomAppState extends State<SegucomApp> {
-  late CallingService _callingService;
-
   @override
   void initState() {
     //NotificationController.startListeningNotificationEvents();
 
     // Inicializa el servicio de llamadas
-    /*
-    _callingService = CallingService(
-      callerName: 'Nombre del Llamador',  // Asigna un nombre de llamador apropiado
-      callerNumber: 'Número del Llamador',  // Asigna un número de llamador apropiado
-      userElementNumber: '80100',  // El número de elemento del usuario actual
-    );
-     // Llama al método initialize para configurar el servicio
-    _callingService.initialize().then((_) {
-      // Puedes agregar lógica adicional aquí después de la inicialización, si es necesario
-    }).catchError((error) {
-      print('Error al inicializar CallingService: $error');
-    });
-    */
+
     super.initState();
   }
 
@@ -128,7 +119,7 @@ class _SegucomAppState extends State<SegucomApp> {
         '/menu': (context) => MenuScreen(),
         '/notification-page': (context) => NotificationPage(
             receivedAction: NotificationController.initialAction!),
-            '/permision': (context) => RequestPermissionScreen(),
+        '/permisions': (context) => RequestPermissionScreen(),
       },
     );
   }
@@ -151,10 +142,6 @@ class _SplashScreenState extends State<SplashScreen> {
     final String? authToken = prefs.getString('authToken');
     final String? permisionApp = prefs.getString('configPermissions');
 
-    final String _tel = prefs.getInt('NumeroTel').toString();
-    print("VALOR DE PERMISOS: " + permisionApp.toString());
-    print("VALOR DE TOKEN: " + authToken.toString());
-
     if (authToken != null) {
       final url =
           Uri.parse(ConfigBackend.backendUrl + '/segucom/api/data-protegida');
@@ -174,26 +161,22 @@ class _SplashScreenState extends State<SplashScreen> {
           print('Datos del usuario: $userData');
           final String _numElemento = prefs.getString('NumeroElemento')!;
 
-          if (permisionApp != null) {
-          // await initializeService();
-           // final MessageService messageService = MessageService(_numElemento);
+          //final MessageService messageService = MessageService(_numElemento);
+          print(permisionApp);
+          // Navegar al menú principal u otra pantalla segura
+          if (permisionApp == 'true') {
             Navigator.pushReplacementNamed(context, '/menu');
-            
           } else {
-            // Navega a HomeScreen sin usar Navigator
-           Navigator.pushReplacementNamed(context, '/permision');
+            Navigator.pushReplacementNamed(context, '/permisions');
           }
         } else {
-          print("############## valor de response.statusCode: " +
-              response.statusCode.toString());
-          print(permisionApp);
-          // Navega a HomeScreen sin usar Navigator
-          /*
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                  builder: (context) => RequestPermissionScreen()),
-            );
-          */
+          if (permisionApp == 'true') {
+            Navigator.pushReplacementNamed(context, '/config');
+          } else {
+            Navigator.pushReplacementNamed(context, '/permisions');
+          }
+          // Si el token es inválido o ha expirado, muestra la pantalla de inicio de sesión
+          Navigator.pushReplacementNamed(context, '/config');
         }
       } catch (e) {
         print('Error en la solicitud HTTP:' + e.toString());
@@ -201,18 +184,14 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacementNamed(context, '/config');
       }
     } else {
-      //si no hay un token aun
-      if(permisionApp == null){
-        Navigator.pushReplacementNamed(context, '/permision');
-      }
-      else{
-        //que si tiene permisos
-        Navigator.pushReplacementNamed(context, '/config');
-      }
       // No hay token guardado, navegar a la pantalla de inicio de sesión
-      //Navigator.pushReplacementNamed(context, '/config');
+
+      if (permisionApp == 'true') {
+        Navigator.pushReplacementNamed(context, '/config');
+      } else {
+        Navigator.pushReplacementNamed(context, '/permisions');
+      }
     }
-    
   }
 
   @override
@@ -268,7 +247,7 @@ class NotificationPage extends StatelessWidget {
     );
   }
 }
-/*
+
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
 
@@ -306,7 +285,7 @@ Future<void> initializeService() async {
     ),
   );
 }
-*/
+
 @pragma('vm:entry-point')
 Future<bool> onIosBackground(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -317,94 +296,15 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
-  DartPluginRegistrant.ensureInitialized();
 
-  if (service is AndroidServiceInstance) {
-    service.setAsForegroundService();
-    
-    service.setForegroundNotificationInfo(
-      title: 'SEGUCOM SERVICE',
-      content: 'Service is running in the background',
-    );
-  }
-
-  late IO.Socket socket;
-  final UbicationService _ubicationService = UbicationService();
+  // Configura la notificación
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  
-  await NotificationController.initializeLocalNotifications(); // Asegúrate de inicializar aquí
-  await _createNotificationChannel(flutterLocalNotificationsPlugin); // Crea el canal aquí
-
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  final String? authToken = prefs.getString('authToken');
-  final String _tel = prefs.getInt('NumeroTel').toString();
-  final String _numElemento = prefs.getString('NumeroElemento')!;
-
-  NotificationController.startListeningNotificationEvents();
-
-  final VolumeService volumeService = VolumeService(_numElemento, _tel);
-  
-  if (authToken != null) {
-    final MessageService messageService = MessageService(_numElemento);
-    
-    Timer.periodic(const Duration(minutes: 1), (timer) async {
-      if (service is AndroidServiceInstance && await service.isForegroundService()) {
-        // Configurar la notificación en primer plano
- 
-        try {
-         
-         await _ubicationService.sendLocation("", _tel, _numElemento);
-        } catch (e) {
-          print("Error al enviar ubicación: $e");
-        }
-      }
-    });
-  }
-}
-
-Future<void> requestPermissions() async {
-  // Solicitar permisos de ubicación
-  var statusFineLocation = await Permission.locationWhenInUse.request();
-  var statusCoarseLocation = await Permission.locationAlways.request();
-  var statusBackgroundLocation = await Permission.location.request();
-
-  // Comprobar si se han concedido todos los permisos
-  if (statusFineLocation.isGranted &&
-      statusCoarseLocation.isGranted &&
-      statusBackgroundLocation.isGranted) {
-    print("Todos los permisos de ubicación concedidos");
-  } else {
-    print("Algunos permisos de ubicación no fueron concedidos");
-  }
-}
-
-Future<void> _createNotificationChannel(
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin) async {
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'my_foreground', // id del canal
-    'MY FOREGROUND SERVICE', // nombre del canal
-    description: 'This channel is used for important notifications.', // descripción
-    importance: Importance.high,
-  );
-
-  // Crea el canal de notificación
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-}
-
-
-Future<void> initializeService() async {
-
-   await requestPermissions(); // Solicita permisos primero
-
-  final service = FlutterBackgroundService();
 
   const notificationChannelId = 'my_foreground';
   const notificationId = 888;
 
+  // Crear una notificación para el servicio
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     notificationChannelId,
     'MY FOREGROUND SERVICE',
@@ -412,35 +312,60 @@ Future<void> initializeService() async {
     importance: Importance.high,
   );
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  // Crea el canal de notificación
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  await service.configure(
-    androidConfiguration: AndroidConfiguration(
-      onStart: onStart,
-      autoStart: true,
-      isForegroundMode: true,
-      notificationChannelId: notificationChannelId,
-      initialNotificationTitle: 'SEGUCOM SERVICE',
-      initialNotificationContent: 'Service is running in the background',
-      foregroundServiceNotificationId: notificationId,
-    ),
-    iosConfiguration: IosConfiguration(
-      autoStart: true,
-      onForeground: onStart,
-      onBackground: onIosBackground,
+  // Configura y muestra la notificación
+  await flutterLocalNotificationsPlugin.show(
+    notificationId,
+    'SEGUCOM SERVICE',
+    'Service is running in the background',
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        notificationChannelId,
+        'MY FOREGROUND SERVICE',
+        channelDescription: 'This channel is used for important notifications.',
+        importance: Importance.high,
+        priority: Priority.high,
+        ongoing: true,
+      ),
     ),
   );
+
+  late IO.Socket socket;
+  final UbicationService _ubicationService = UbicationService();
+//  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final String? authToken = prefs.getString('authToken');
+
+  final String _tel = prefs.getInt('NumeroTel').toString();
+  final String _numElemento = prefs.getString('NumeroElemento')!;
+
+  await NotificationController.initializeLocalNotifications();
+  await NotificationController.initializeIsolateReceivePort();
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final VolumeService volumeService =
+      VolumeService(_numElemento, _tel); // Inicializar VolumeService
+  final MessageService messageService = MessageService(_numElemento);
+
+  if (authToken != null) {
+//INICIA EL SERVICIO DE MENSAJES
+// INICIA AQUI EL BTON DE PANICO
+
+    //INICIA EL SERVICIO DE UBICACION
+
+    Timer.periodic(const Duration(minutes: 1), (timer) async {
+      if (service is AndroidServiceInstance) {
+        if (await service.isForegroundService()) {
+          _ubicationService.sendLocation("", _tel, _numElemento);
+          // Métodos a ejecutar en foreground
+          // NotificationController.createNewNotification("Hola", "Ubicacion enviada");
+        }
+      }
+    });
+  }
 }
-
-
-
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////- permsos

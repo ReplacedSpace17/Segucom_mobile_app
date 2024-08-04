@@ -5,6 +5,7 @@ import 'package:segucom_app/screens/App.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/Home/Options/Option1.dart';
 import 'package:segucom_app/screens/Mi_perfil/UpdateName.dart';
+import 'package:segucom_app/versionApp.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../configBackend.dart';
@@ -233,10 +234,18 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                         color: Color(0xFF3F3F3F),
                       ),
                     ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Versión: '+VersionApp.version,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF3F3F3F),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              SizedBox(height: 45),
+              SizedBox(height: 30),
               Text(
                 'Información personal',
                 style: TextStyle(

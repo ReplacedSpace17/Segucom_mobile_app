@@ -91,27 +91,21 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadTelefono();
     super.initState();
     _initialize(); //inciializar grabador de audio
-    _connectSocket();
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
     });
-    print("Conectando INIT.................................................................................");
-  _socket?.emit('joinChat', {
-      'userId1': widget.numElemento,
-      'userId2': widget.chatData['ELEMENTO_NUM'],
-    });
+
     socket.on('receiveMessage', (data) {
       print('Nuevo mensaje recibido desde servidor: $data');
       _handleReceivedMessage(data);
     });
-  
-    
+
     socket.connect();
     fetchMessages();
 
     _requestPermissions();
     _initializeRenderers();
-    
+    _connectSocket();
     _createPeerConnection();
     _getMediaDevices();
   }
@@ -119,7 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _loadNombre() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _callerName = prefs.getString('NombreBD') ?? '';
+      _callerName = prefs.getString('Name') ?? '';
     });
   }
 
@@ -132,10 +126,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-      _socket?.emit('leaveChat', {
-    'userId': widget.numElemento, // Asegúrate de pasar el ID del usuario
-    'chatId': widget.chatData['ELEMENTO_NUM'], // El ID de la sala de chat
-  });
     // Cerrar el grabador y reproductor de audio
     _recorder.closeRecorder();
     _player.closePlayer();
@@ -167,33 +157,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _connectSocket() {
-    print("Conectando socket.................................................................................");
     _socket =
         IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
     });
 
     _socket?.on('connect', (_) {
-      print("CONECTADO socket.................................................................................");
       print('connected');
       if (widget.numElemento.isNotEmpty) {
         _socket?.emit('setId', widget.numElemento);
-
-// Emitir el evento joinChat con un mapa
-   if (_socket?.connected ?? false) {
-    
-} else {
-    print('Socket no está conectado');
-}
-
       }
-
-  
- print("#########################################################3  UserId1: ${widget.numElemento}");
-print("########################################################## UserId2: ${widget.chatData['ELEMENTO_NUM']}");
     });
-
-    
 
     _socket?.on('offer', (data) async {
       print("Oferta recibida");
@@ -301,7 +275,6 @@ print("########################################################## UserId2: ${wid
         'isVideoCall': true,
         'callerName': _callerName,
         'callerNumber': _callerNumber,
-        'me': widget.numElemento
       });
       setState(() {
         _inCall = true;
@@ -336,7 +309,6 @@ print("########################################################## UserId2: ${wid
         'isVideoCall': false,
         'callerName': _callerName,
         'callerNumber': _callerNumber,
-        'me': widget.numElemento
       });
       setState(() {
         _inCall = true;
@@ -376,13 +348,10 @@ print("########################################################## UserId2: ${wid
       _inCall = false;
     });
       // Cerrar la aplicación
-      /*
   if (Platform.isAndroid || Platform.isIOS) {
     // Cierra la aplicación
     exit(0);
   }
-  
-  */
   }
 
   void _showCallDialog(RTCSessionDescription description, bool isVideoCall,
@@ -662,7 +631,6 @@ print("########################################################## UserId2: ${wid
       print('Error fetching messages: $e');
     }
   }
-
 void _handleReceivedMessage(dynamic data) {
   // Verificar si el mensaje pertenece al grupo actual y el remitente es el correcto
   //imprimir el to y el numElemento
@@ -949,21 +917,17 @@ Widget _buildMessage(Map<String, dynamic> message) {
   );
 }
   
-Widget _buildDateSeparator(String date) {
-  DateTime dateTime = DateTime.parse(date);
-  String formattedDate = DateFormat('dd/MM/yyyy').format(dateTime); // Cambia el formato si lo deseas
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Center(
-      child: Text(
-        formattedDate,
-        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+  Widget _buildDateSeparator(String date) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          DateFormat('dd/MM/yyyy').format(DateTime.parse(date)),
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 @override
 Widget build(BuildContext context) {
   return Scaffold(
@@ -1005,30 +969,29 @@ Widget build(BuildContext context) {
               : ListView.builder(
                   controller: _scrollController,
                   itemCount: messages.length,
-itemBuilder: (context, index) {
-  var message = messages[index];
-  bool showDateSeparator = false;
+                  itemBuilder: (context, index) {
+                    var message = messages[index];
+                    bool showDateSeparator = false;
 
-  if (index == 0) {
-    // Muestra el separador para el primer mensaje
-    showDateSeparator = true;
-  } else {
-    String prevMessageDate =
-        messages[index - 1]['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    String currentMessageDate =
-        message['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    showDateSeparator = prevMessageDate != currentMessageDate; // Compara las fechas
-  }
+                    if (index == 0) {
+                      showDateSeparator = true;
+                    } else {
+                      String prevMessageDate =
+                          messages[index - 1]['FECHA'].split('T')[0];
+                      String currentMessageDate =
+                          message['FECHA'].split('T')[0];
+                      showDateSeparator =
+                          prevMessageDate != currentMessageDate;
+                    }
 
-  return Column(
-    children: [
-      if (showDateSeparator)
-        _buildDateSeparator(message['FECHA']), // Mostrar separador solo si es necesario
-      _buildMessage(message), // Construir el mensaje
-    ],
-  );
-}
-
+                    return Column(
+                      children: [
+                        if (showDateSeparator)
+                          _buildDateSeparator(message['FECHA']),
+                        _buildMessage(message),
+                      ],
+                    );
+                  },
                 ),
         ),
         Padding(

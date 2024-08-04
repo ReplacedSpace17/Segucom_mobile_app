@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 
@@ -9,11 +10,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../configBackend.dart';
 
 import 'package:flutter_sound/flutter_sound.dart';
 
 import 'package:video_player/video_player.dart';
+import 'package:dio/dio.dart';
 
 class ChatScreenGroup extends StatefulWidget {
   //audio
@@ -21,11 +24,15 @@ class ChatScreenGroup extends StatefulWidget {
   final Map<String, dynamic> chatData;
   final String numElemento;
   final String idGrupo;
+  final List<dynamic> messages; // Nuevo parámetro
 
-  ChatScreenGroup(
-      {required this.chatData,
-      required this.numElemento,
-      required this.idGrupo});
+  ChatScreenGroup({
+    required this.chatData,
+    required this.numElemento,
+    required this.idGrupo,
+    this.messages =
+        const [], // Inicializa con una lista vacía si no se pasan mensajes
+  });
 
   @override
   _ChatScreenGroupState createState() => _ChatScreenGroupState();
@@ -48,9 +55,21 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   bool _isPlaying = false;
   String _filePath = '';
 
+String? _thumbnailPath;
+
+//Map<int, bool> _isPlayingMap = {};
+Map<int, bool> _isPlayingMap = {};
+
   /// video
-  VideoPlayerController? _videoController;
-  
+  late VideoPlayerController _videoController;
+
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  String? _localVideoPath;
+
+String? _downloadingMessageId;
+
+bool _isSendingVideo = false; // Agrega esta línea
 
   Future<void> _initialize() async {
     await _recorder.openRecorder();
@@ -70,6 +89,17 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   void initState() {
     super.initState();
     getNameRemitenteGroupChat(widget.numElemento);
+    // Si se pasaron mensajes, usarlos directamente
+    if (widget.messages.isNotEmpty) {
+      setState(() {
+        messages = widget.messages; // Asigna los mensajes pasados
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    } else {
+      // Si no se pasaron mensajes, ejecutar fetchMessages
+      fetchMessages();
+    }
+
     _initialize(); //inciializar grabador de audio
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
@@ -90,7 +120,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     });
 
     socket.connect();
-    fetchMessages();
+    //fetchMessages();
   }
 
   @override
@@ -99,8 +129,13 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     _recorder.closeRecorder();
     _player.closePlayer();
 
+// Liberar el controlador de video si está inicializado
+    if (_videoController != null) {
+      _videoController!.dispose();
+    }
+
     messageController.dispose();
-    _videoController?.dispose();
+
     super.dispose();
   }
 
@@ -120,19 +155,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     await _sendAudioMessage(_filePath);
   }
 
-  Future<void> _startPlaying() async {
-    await _player.startPlayer(
-        fromURI: _filePath,
-        whenFinished: () {
-          setState(() {
-            _isPlaying = false;
-          });
-        });
-    print("LINK DE AUDIO:" + _filePath);
-    setState(() {
-      _isPlaying = true;
-    });
-  }
+
 
   Future<void> _stopPlaying() async {
     await _player.stopPlayer();
@@ -277,46 +300,46 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     }
   }
 
-void _handleReceivedMessage(dynamic data) {
-  // Verificar si el mensaje pertenece al grupo actual
-  if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
-    var receivedMessage = {
-      'MENSAJE_ID': data['MENSAJE_ID'],
-      'FECHA': data['FECHA'],
-      'REMITENTE': data['REMITENTE'],
-      'MENSAJE': data['MENSAJE'],
-      'MEDIA': data['MEDIA'],
-      'UBICACION': data['UBICACION'],
-      'NOMBRE': data['NOMBRE'],
-    };
+  void _handleReceivedMessage(dynamic data) {
+    // Verificar si el mensaje pertenece al grupo actual
+    if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
+      var receivedMessage = {
+        'MENSAJE_ID': data['MENSAJE_ID'],
+        'FECHA': data['FECHA'],
+        'REMITENTE': data['REMITENTE'],
+        'MENSAJE': data['MENSAJE'],
+        'MEDIA': data['MEDIA'],
+        'UBICACION': data['UBICACION'],
+        'NOMBRE': data['NOMBRE'],
+      };
 
-    // Verificar si el mensaje ya existe en la lista de mensajes
-    bool messageExists = messages
-        .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+      // Verificar si el mensaje ya existe en la lista de mensajes
+      bool messageExists = messages
+          .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
 
-    if (!messageExists) {
-      if (mounted) {
-        setState(() {
-          // Ajustar la URL completa del servidor
-          if (receivedMessage['MEDIA'] == 'IMAGE') {
-            receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-          }
-          if (receivedMessage['MEDIA'] == 'VIDEO') {
-            receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-          }
-          messages.add(receivedMessage);
-        });
+      if (!messageExists) {
+        if (mounted) {
+          setState(() {
+            // Ajustar la URL completa del servidor
+            if (receivedMessage['MEDIA'] == 'IMAGE') {
+              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+            }
+            if (receivedMessage['MEDIA'] == 'VIDEO') {
+              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+            }
+            messages.add(receivedMessage);
+          });
 
-        // Desplazarse al final de la lista de mensajes
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _scrollToBottom());
+          // Desplazarse al final de la lista de mensajes
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
       }
+    } else {
+      print(
+          'Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
     }
-  } else {
-    print('Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
   }
-}
-
 
   Future<void> sendMessage(String message) async {
     var currentDate = DateTime.now();
@@ -421,7 +444,7 @@ void _handleReceivedMessage(dynamic data) {
           'MENSAJE':
               '', // Asegúrate de convertir imageUrl a String si es necesario
           'MEDIA': 'IMAGE',
-          'NOMBRE': 'XSX',
+          
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
           'ELEMENTO_NUMERO': widget.numElemento,
@@ -507,7 +530,7 @@ void _handleReceivedMessage(dynamic data) {
           'REMITENTE': widget.numElemento,
           'MENSAJE': '',
           'MEDIA': 'VIDEO', // Cambiado de 'IMAGE' a 'VIDEO'
-          'NOMBRE': 'XSX',
+          
           'UBICACION': videoUrl.toString(),
           'ELEMENTO_NUMERO': widget.numElemento,
           'NOMBRE_REMITENTE': NombreRemitente,
@@ -542,196 +565,324 @@ void _handleReceivedMessage(dynamic data) {
     );
   }
 
-Widget _buildMessage(Map<String, dynamic> message) {
-  if (message == null) {
-    return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
+Future<Uint8List?> _generateThumbnail(String videoUrl) async {
+  try {
+    final uint8List = await VideoThumbnail.thumbnailData(
+      video: videoUrl,
+      imageFormat: ImageFormat.PNG,
+      maxWidth: 200, // Ajusta según sea necesario
+      quality: 75,
+    );
+    print('Miniatura generada con éxito');
+    return uint8List;
+  } catch (e) {
+    print('Error generando miniatura: $e');
+    return null;
   }
+}
 
-  bool isMe = message['REMITENTE'].toString() == widget.numElemento;
-  bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
-  bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
-  bool isVideo = message.containsKey('MEDIA') && message['MEDIA'] == 'VIDEO';
-  String messageText = message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
-  String remitente = message['NOMBRE'] ?? '';
-  String fecha = message['FECHA'] ?? '';
+  Widget _buildMessage(Map<String, dynamic> message) {
+    if (message == null) {
+      return SizedBox(); // Puedes ajustar esto según lo que desees mostrar para mensajes nulos
+    }
 
-  return Align(
-    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isMe ? Colors.blueAccent : Colors.grey[300],
-        borderRadius: isMe
-            ? BorderRadius.only(
-                topLeft: Radius.circular(10),
-                bottomLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              )
-            : BorderRadius.only(
-                topRight: Radius.circular(10),
-                bottomRight: Radius.circular(10),
-                topLeft: Radius.circular(10),
-              ),
-      ),
-      child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (isMedia)
-            GestureDetector(
-              onTap: () {
-                // Mostrar la imagen en una vista emergente
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return Dialog(
-                      child: InteractiveViewer(
-                        child: Image.network(
-                          '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-                          fit: BoxFit.contain,
-                          width: double.infinity, // Ajusta el ancho
-                          height: 400, // Ajusta la altura
+    bool isMe = message['REMITENTE'].toString() == widget.numElemento;
+    bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
+    bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
+    bool isVideo = message.containsKey('MEDIA') && message['MEDIA'] == 'VIDEO';
+    //comprobar si messge contiene MENSAJE_ID
+    bool isID = message.containsKey('MENSAJE_ID');
+   // print("Contiene ID?: " + isID.toString());
+   //  print("######################################################################################################## " + message['MENSAJE_ID'].toString());
+    String messageText =
+        message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
+    String remitente = message['NOMBRE'] ?? '';
+    String fecha = message['FECHA'] ?? '';
+    //print(message);
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 3, horizontal: 10),
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blueAccent : Colors.grey[300],
+          borderRadius: isMe
+              ? BorderRadius.only(
+                  topLeft: Radius.circular(10),
+                  bottomLeft: Radius.circular(10),
+                  topRight: Radius.circular(10),
+                )
+              : BorderRadius.only(
+                  topRight: Radius.circular(10),
+                  bottomRight: Radius.circular(10),
+                  topLeft: Radius.circular(10),
+                ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            if (isMedia)
+              GestureDetector(
+                onTap: () {
+                  // Mostrar la imagen en una vista emergente
+                  showDialog(
+                    context: context,
+                    builder: (context) {
+                      return Dialog(
+                        child: InteractiveViewer(
+                          child: Image.network(
+                            '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                            fit: BoxFit.contain,
+                            width: double.infinity, // Ajusta el ancho
+                            height: 400, // Ajusta la altura
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-              child: Image.network(
-                '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-                width: 200,
-                height: 200,
-                fit: BoxFit.cover,
+                      );
+                    },
+                  );
+                },
+                child: Image.network(
+                  '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                ),
               ),
-            ),
-          if (isAudio)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black,
+            if (isAudio)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isPlaying ? Icons.stop : Icons.play_arrow,
-                    color: isMe ? Colors.white : Colors.black,
-                  ),
-                  onPressed: () async {
-                    print(
-                        'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
-                    if (_isPlaying) {
-                      await _stopPlaying();
-                    } else {
+                  IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.stop : Icons.play_arrow,
+                      color: isMe ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () async {
+                      String audioUrl =
+                          '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}';
+                      print('REPRODUCIENDO DE: $audioUrl');
+
+                      // Detener la reproducción actual si está en curso
+                      if (_isPlaying) {
+                        await _stopPlaying();
+                      }
+
+                      // Reiniciar el reproductor de audio
+                      _player =
+                          FlutterSoundPlayer(); // Reinicializa el reproductor
+                      await _player
+                          .openPlayer(); // Asegúrate de abrir el reproductor antes de reproducir
+
+                      // Iniciar la reproducción del nuevo audio
                       await _player.startPlayer(
-                        fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                        fromURI: audioUrl,
                         whenFinished: () {
                           setState(() {
                             _isPlaying = false;
                           });
                         },
                       );
+
                       setState(() {
                         _isPlaying = true;
                       });
+                    },
+                  ),
+                ],
+              ),
+if (isVideo)
+  FutureBuilder<Uint8List?>(
+    future: _generateThumbnail('${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}'),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        // Muestra solo el texto de carga si se está generando la miniatura
+        return Center(
+          child: Text(
+            _isDownloading
+                ? '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video'
+                : 'Cargando miniatura...',
+            style: TextStyle(color: Colors.white),
+          ),
+        );
+      } else if (snapshot.hasError) {
+        return Text('Error al cargar la miniatura');
+      } else {
+        return GestureDetector(
+          onTap: () async {
+            // Comienza la descarga del video
+            await _downloadVideo('${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}');
+            // Una vez descargado, reprodúzcalo
+            if (_localVideoPath != null) {
+              _playVideo(_localVideoPath!);
+            }
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.memory(
+                snapshot.data!,
+                width: 200, // Ajusta el ancho de la miniatura
+                height: 200, // Ajusta la altura de la miniatura
+                fit: BoxFit.cover,
+              ),
+              Icon(
+                Icons.play_arrow,
+                color: Colors.white,
+                size: 64.0, // Tamaño del ícono de reproducción
+              ),
+              if (_isDownloading)
+                Positioned(
+                  bottom: 10,
+                  child: Text(
+                    '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }
+    },
+  ),
+
+            if (!isMedia && !isAudio && !isVideo)
+              Text(
+                messageText,
+                style: TextStyle(color: isMe ? Colors.white : Colors.black),
+              ),
+            SizedBox(height: 4),
+            Text(
+              fecha.isNotEmpty
+                  ? DateFormat('HH:mm').format(DateTime.parse(fecha))
+                  : '',
+              style: TextStyle(
+                  color: isMe ? Colors.white70 : Colors.black54,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400),
+            ),
+            SizedBox(
+                height: 2), // Espacio entre el texto del mensaje y el remitente
+            Text(
+              remitente,
+              style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.black54,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+  Future<void> _downloadVideo(String url) async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      var dir = await getTemporaryDirectory();
+      String filePath = '${dir.path}/video.mp4';
+
+      await Dio().download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+
+      setState(() {
+        _localVideoPath = filePath;
+        _isDownloading = false;
+      });
+      print('Video descargado a: $filePath');
+    } catch (e) {
+      print('Error al descargar el video: $e');
+      setState(() {
+        _isDownloading = false;
+      });
+    }
+  }
+
+  void _playVideo(String videoPath) {
+    _videoController = VideoPlayerController.file(File(videoPath))
+      ..initialize().then((_) {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) =>
+              FullScreenVideoPlayer(controller: _videoController),
+        ));
+      });
+  }
+
+  Widget _buildVideoPlayer(String videoUrl, double width, double height) {
+    VideoPlayerController videoController =
+        VideoPlayerController.network(videoUrl);
+
+    return FutureBuilder<void>(
+      future: videoController.initialize(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          // Aquí se asegura que el videoController está correctamente inicializado
+          return Container(
+            width: width,
+            height: height,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AspectRatio(
+                  aspectRatio: videoController.value.aspectRatio,
+                  child: VideoPlayer(videoController),
+                ),
+                IconButton(
+                  icon: Icon(
+                    videoController.value.isPlaying
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 64.0,
+                  ),
+                  onPressed: () {
+                    if (videoController.value.isInitialized) {
+                      setState(() {
+                        videoController.value.isPlaying
+                            ? videoController.pause()
+                            : videoController.play();
+                      });
+                      _goFullScreen(context, videoController);
                     }
                   },
                 ),
               ],
             ),
-          if (isVideo)
-            _buildVideoPlayer(
-              '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-              200,
-              200,
-            ),
-          if (!isMedia && !isAudio && !isVideo)
-            Text(
-              messageText,
-              style: TextStyle(color: isMe ? Colors.white : Colors.black),
-            ),
-          SizedBox(height: 4),
-          Text(
-            fecha.isNotEmpty
-                ? DateFormat('HH:mm').format(DateTime.parse(fecha))
-                : '',
-            style: TextStyle(
-                color: isMe ? Colors.white70 : Colors.black54,
-                fontSize: 11,
-                fontWeight: FontWeight.w400),
-          ),
-          SizedBox(height: 2), // Espacio entre el texto del mensaje y el remitente
-          Text(
-            remitente,
-            style: TextStyle(
-              color: isMe ? Colors.white70 : Colors.black54,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-Widget _buildVideoPlayer(String videoUrl, double width, double height) {
-  // Verifica si el controlador ya está inicializado
-  if (_videoController == null) {
-    _videoController = VideoPlayerController.network(videoUrl)
-      ..initialize().then((_) {
-        setState(() {}); // Actualiza el estado una vez inicializado
-      });
+          );
+        } else {
+          return CircularProgressIndicator();
+        }
+      },
+    );
   }
 
-  return FutureBuilder<void>(
-    future: _videoController!.initialize(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.done) {
-        // Obtener las dimensiones originales del video
-        final size = _videoController!.value.size;
-        double aspectRatio = size.width > 0 && size.height > 0
-            ? size.width / size.height
-            : 16 / 9; // Valor por defecto
-
-        return Container(
-          width: width,
-          height: height,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AspectRatio(
-                aspectRatio: aspectRatio,
-                child: VideoPlayer(_videoController!),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 64.0, // Tamaño del ícono
-                ),
-                onPressed: () {
-                  // Reproducir el video al presionar el ícono
-                  _videoController!.play();
-                  _goFullScreen(context); // Llama a la función para ir a pantalla completa
-                },
-              ),
-            ],
-          ),
-        );
-      } else {
-        return CircularProgressIndicator();
-      }
-    },
-  );
-}
-
-  void _goFullScreen(BuildContext context) {
+  void _goFullScreen(
+      BuildContext context, VideoPlayerController videoController) {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) =>
-          FullScreenVideoPlayer(controller: _videoController!),
+      builder: (context) => FullScreenVideoPlayer(controller: videoController),
     ));
   }
 
@@ -742,17 +893,20 @@ Widget _buildVideoPlayer(String videoUrl, double width, double height) {
     _videoController!.play(); // Opcional: iniciar reproducción automáticamente
   }
 
-  Widget _buildDateSeparator(String date) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Center(
-        child: Text(
-          DateFormat('dd/MM/yyyy').format(DateTime.parse(date)),
-          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-        ),
+Widget _buildDateSeparator(String date) {
+  DateTime dateTime = DateTime.parse(date);
+  String formattedDate = DateFormat('dd/MM/yyyy').format(dateTime); // Cambia el formato si lo deseas
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Center(
+      child: Text(
+        formattedDate,
+        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -785,29 +939,30 @@ Widget _buildVideoPlayer(String videoUrl, double width, double height) {
                 : ListView.builder(
                     controller: _scrollController,
                     itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      var message = messages[index];
-                      bool showDateSeparator = false;
+           itemBuilder: (context, index) {
+  var message = messages[index];
+  bool showDateSeparator = false;
 
-                      if (index == 0) {
-                        showDateSeparator = true;
-                      } else {
-                        String prevMessageDate =
-                            messages[index - 1]['FECHA'].split('T')[0];
-                        String currentMessageDate =
-                            message['FECHA'].split('T')[0];
-                        showDateSeparator =
-                            prevMessageDate != currentMessageDate;
-                      }
+  if (index == 0) {
+    // Muestra el separador para el primer mensaje
+    showDateSeparator = true;
+  } else {
+    String prevMessageDate =
+        messages[index - 1]['FECHA'].split(' ')[0]; // Extrae solo la fecha
+    String currentMessageDate =
+        message['FECHA'].split(' ')[0]; // Extrae solo la fecha
+    showDateSeparator = prevMessageDate != currentMessageDate; // Compara las fechas
+  }
 
-                      return Column(
-                        children: [
-                          if (showDateSeparator)
-                            _buildDateSeparator(message['FECHA']),
-                          _buildMessage(message),
-                        ],
-                      );
-                    },
+  return Column(
+    children: [
+      if (showDateSeparator)
+        _buildDateSeparator(message['FECHA']), // Mostrar separador solo si es necesario
+      _buildMessage(message), // Construir el mensaje
+    ],
+  );
+}
+
                   ),
           ),
           Padding(
@@ -922,28 +1077,106 @@ class VideoPlayerControls extends StatelessWidget {
   }
 }
 
-class FullScreenVideoPlayer extends StatelessWidget {
+class FullScreenVideoPlayer extends StatefulWidget {
   final VideoPlayerController controller;
 
   FullScreenVideoPlayer({required this.controller});
+
+  @override
+  _FullScreenVideoPlayerState createState() => _FullScreenVideoPlayerState();
+}
+
+class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
+  late VideoPlayerController _controller;
+  late ValueNotifier<int> _currentPosition;
+  late ValueNotifier<int> _totalDuration;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = widget.controller;
+    _currentPosition = ValueNotifier<int>(0);
+    _totalDuration = ValueNotifier<int>(0);
+
+    _controller.addListener(() {
+      if (_controller.value.isInitialized) {
+        setState(() {
+          _currentPosition.value = _controller.value.position.inSeconds;
+          _totalDuration.value = _controller.value.duration.inSeconds;
+        });
+      }
+    });
+    _controller.play(); // Inicia la reproducción automáticamente
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: AspectRatio(
-          aspectRatio:
-              controller.value.aspectRatio, // Usa el aspecto original del video
-          child: VideoPlayer(controller),
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: _controller.value.aspectRatio,
+              child: VideoPlayer(_controller),
+            ),
+            SizedBox(height: 20), // Espacio entre el video y el control
+            Row(
+              children: [
+                ValueListenableBuilder<int>(
+                  valueListenable: _currentPosition,
+                  builder: (context, currentPosition, child) {
+                    return Text(
+                      '${Duration(seconds: currentPosition).toString().split('.').first}',
+                      style: TextStyle(color: Colors.white),
+                    );
+                  },
+                ),
+                Expanded(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _totalDuration,
+                    builder: (context, totalDuration, child) {
+                      return Slider(
+                        value: _currentPosition.value.toDouble(),
+                        min: 0,
+                        max: totalDuration.toDouble(),
+                        onChanged: (value) {
+                          _controller.seekTo(Duration(seconds: value.toInt()));
+                        },
+                      );
+                    },
+                  ),
+                ),
+                ValueListenableBuilder<int>(
+                  valueListenable: _totalDuration,
+                  builder: (context, totalDuration, child) {
+                    return Text(
+                      '${Duration(seconds: totalDuration).toString().split('.').first}',
+                      style: TextStyle(color: Colors.white),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          controller.value.isPlaying ? controller.pause() : controller.play();
+          setState(() {
+            _controller.value.isPlaying
+                ? _controller.pause()
+                : _controller.play();
+          });
         },
         child:
-            Icon(controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
+            Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
       ),
     );
   }
