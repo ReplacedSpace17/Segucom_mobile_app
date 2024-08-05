@@ -69,6 +69,8 @@ dependencies:
   dio: ^5.5.0+1
   video_thumbnail: ^0.5.3
   uuid: ^4.4.2
+  chewie: ^1.8.2
+  cached_network_image: ^3.3.1
   
 
 dev_dependencies:

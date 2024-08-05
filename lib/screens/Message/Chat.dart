@@ -901,6 +901,7 @@ Widget _buildMessage(Map<String, dynamic> message) {
                 fit: BoxFit.cover,
               ),
             ),
+        
           if (isAudio)
             Row(
               children: [
@@ -939,6 +940,7 @@ Widget _buildMessage(Map<String, dynamic> message) {
                 ),
               ],
             ),
+   
           if (!isMedia && !isAudio)
             Text(
               messageText,

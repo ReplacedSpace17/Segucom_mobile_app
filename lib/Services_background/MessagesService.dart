@@ -84,9 +84,11 @@ class MessageService {
     lastMessageId = messageId;
 
     if (data['to'] != null) {
+      print("mnsg privado");
       _handlePrivateMessage(data);
     } else if (data['GRUPO_DESCRIP'] != null) {
       _handleGroupMessage(data);
+      print("mnsg de grupo");
     }
   }
 
