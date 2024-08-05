@@ -1,6 +1,8 @@
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import '../../configBackend.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,11 +18,20 @@ class _UpdateAndroidIDScreenState extends State<UpdateAndroidIDScreen> {
   final TextEditingController elementController = TextEditingController();
   bool showPassword = false;
 
+Future<void> requestPermissions() async {
+  await Permission.phone.request();
+}
+
   Future<void> _updateAndroidID() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
 
+    //crear un nuevo uidd
+     // Genera un UUID
+  var uuid = Uuid();
+  String uniqueID = uuid.v4(); // Genera un UUID v4
+  print(uniqueID);
     final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/user/android/updateID');
     final response = await http.put(
       url,
@@ -31,12 +42,13 @@ class _UpdateAndroidIDScreenState extends State<UpdateAndroidIDScreen> {
         "telefono": phoneController.text,
         "clave": passwordController.text,
         "elemento": elementController.text,
-        "androidID": androidInfo.id,
+        "androidID": uniqueID
       }),
     );
 
     if (response.statusCode == 200) {
       // Actualización exitosa
+       await prefs.setString('AndroidID', uniqueID);
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       _showSuccessSnackBar(responseData['message']);
     } else {
@@ -76,7 +88,7 @@ class _UpdateAndroidIDScreenState extends State<UpdateAndroidIDScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Actualizar Android ID'),
+        title: Text('Actualizar dispositivo'),
       ),
       body: Padding(
         padding: EdgeInsets.all(16.0),
@@ -131,7 +143,7 @@ class _UpdateAndroidIDScreenState extends State<UpdateAndroidIDScreen> {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: _updateAndroidID,
-              child: Text('Actualizar Android ID'),
+              child: Text('Actualizar dispositivo'),
             ),
           ],
         ),

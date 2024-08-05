@@ -54,7 +54,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   bool _isRecording = false;
   bool _isPlaying = false;
   String _filePath = '';
-
+bool _isUploading = false; 
 String? _thumbnailPath;
 
 //Map<int, bool> _isPlayingMap = {};
@@ -486,76 +486,82 @@ bool _isSendingVideo = false; // Agrega esta línea
     }
   }
 
-  Future<void> _sendMediaMessageVIDEO(String filePath, String fileType) async {
-    var currentDate = DateTime.now();
-    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+Future<void> _sendMediaMessageVIDEO(String filePath, String fileType) async {
+  setState(() {
+    _isUploading = true; // Iniciar carga
+  });
 
-    var requestBody = {
-      "FECHA": formattedDate,
-      "RECEPTOR": widget.idGrupo,
-      "MENSAJE": '',
-      "MEDIA": filePath,
-      "TIPO_MEDIA": fileType,
-      "UBICACION": "NA"
-    };
+  var currentDate = DateTime.now();
+  var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
-    var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/video/group/video/${widget.numElemento}/${widget.idGrupo}';
-    print(url);
-    try {
-      var requestBodyJson = jsonEncode(requestBody);
+  var requestBody = {
+    "FECHA": formattedDate,
+    "RECEPTOR": widget.idGrupo,
+    "MENSAJE": '',
+    "MEDIA": filePath,
+    "TIPO_MEDIA": fileType,
+    "UBICACION": "NA"
+  };
 
-      var request = http.MultipartRequest('POST', Uri.parse(url));
-      var file = await http.MultipartFile.fromPath('video', filePath);
-      var fileSizeInBytes = file.length; // Tamaño del archivo en bytes
-      var fileSizeInMB = fileSizeInBytes / (1024 * 1024); // Convertir a MB
+  var url =
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/video/group/video/${widget.numElemento}/${widget.idGrupo}';
+  print(url);
 
-      print(
-          "Archivo para enviar: ${file.filename}, tamaño: ${fileSizeInMB.toStringAsFixed(2)} MB");
+  try {
+    var requestBodyJson = jsonEncode(requestBody);
 
-      request.files.add(file);
-      request.fields['data'] = requestBodyJson;
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+    var file = await http.MultipartFile.fromPath('video', filePath);
+    var fileSizeInBytes = file.length; // Tamaño del archivo en bytes
+    var fileSizeInMB = fileSizeInBytes / (1024 * 1024); // Convertir a MB
 
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+    print(
+        "Archivo para enviar: ${file.filename}, tamaño: ${fileSizeInMB.toStringAsFixed(2)} MB");
 
-      if (response.statusCode == 200) {
-        var responseData = json.decode(response.body);
-        var videoUrl = responseData[
-            'videoUrl']; // Asegúrate de verificar el campo de respuesta
+    request.files.add(file);
+    request.fields['data'] = requestBodyJson;
 
-        var newMessage = {
-          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
-          'FECHA': formattedDate,
-          'REMITENTE': widget.numElemento,
-          'MENSAJE': '',
-          'MEDIA': 'VIDEO', // Cambiado de 'IMAGE' a 'VIDEO'
-          
-          'UBICACION': videoUrl.toString(),
-          'ELEMENTO_NUMERO': widget.numElemento,
-          'NOMBRE_REMITENTE': NombreRemitente,
-          'groupId': widget.idGrupo,
-          'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO'],
-          'GRUPO_ID': widget.idGrupo,
-        };
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
 
-        socket.emit('sendMessage', newMessage);
-        print(newMessage);
-        if (mounted) {
-          setState(() {
-            messages.add(newMessage);
-          });
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => _scrollToBottom());
-        }
-      } else {
-        print('Error: ${response.statusCode}, ${response.body}');
-        throw Exception('Failed to send media message');
+    if (response.statusCode == 200) {
+      var responseData = json.decode(response.body);
+      var videoUrl = responseData['videoUrl']; // Asegúrate de verificar el campo de respuesta
+
+      var newMessage = {
+        'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+        'FECHA': formattedDate,
+        'REMITENTE': widget.numElemento,
+        'MENSAJE': '',
+        'MEDIA': 'VIDEO', // Cambiado de 'IMAGE' a 'VIDEO'
+        'UBICACION': videoUrl.toString(),
+        'ELEMENTO_NUMERO': widget.numElemento,
+        'NOMBRE_REMITENTE': NombreRemitente,
+        'groupId': widget.idGrupo,
+        'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO'],
+        'GRUPO_ID': widget.idGrupo,
+      };
+
+      socket.emit('sendMessage', newMessage);
+      print(newMessage);
+      if (mounted) {
+        setState(() {
+          messages.add(newMessage);
+          _isUploading = false; // Finalizar carga
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
-    } catch (error) {
-      print('Error sending media message: $error');
+    } else {
+      print('Error: ${response.statusCode}, ${response.body}');
+      throw Exception('Failed to send media message');
     }
+  } catch (error) {
+    print('Error sending media message: $error');
+    setState(() {
+      _isUploading = false; // Finalizar carga en caso de error
+    });
   }
+}
 
   void _scrollToBottom() {
     _scrollController.animateTo(
@@ -564,8 +570,8 @@ bool _isSendingVideo = false; // Agrega esta línea
       curve: Curves.easeOut,
     );
   }
-
 Future<Uint8List?> _generateThumbnail(String videoUrl) async {
+  print('Intentando generar miniatura para: $videoUrl');
   try {
     final uint8List = await VideoThumbnail.thumbnailData(
       video: videoUrl,
@@ -573,13 +579,20 @@ Future<Uint8List?> _generateThumbnail(String videoUrl) async {
       maxWidth: 200, // Ajusta según sea necesario
       quality: 75,
     );
-    print('Miniatura generada con éxito');
+
+    if (uint8List == null) {
+      print('Miniatura generada es nula. Verifique el video.');
+    } else {
+      print('Miniatura generada con éxito');
+    }
     return uint8List;
-  } catch (e) {
+  } catch (e, stacktrace) {
     print('Error generando miniatura: $e');
+    print('Stacktrace: $stacktrace');
     return null;
   }
 }
+
 
   Widget _buildMessage(Map<String, dynamic> message) {
     if (message == null) {
@@ -964,6 +977,11 @@ Widget _buildDateSeparator(String date) {
 }
 
                   ),
+          ),
+          if (_isUploading) // Muestra el loader si está subiendo
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Center(child: CircularProgressIndicator()),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),

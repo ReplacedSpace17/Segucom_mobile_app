@@ -147,95 +147,98 @@ class _SplashScreenState extends State<SplashScreen> {
     _autoLogin();
   }
 
-Future<String?> fetchAndroidID(String numeroElemento) async {
-  final url = Uri.parse('${ConfigBackend.backendUrl}/segucom/api/user/android/$numeroElemento');
-  print('URL: $url');
-
-  try {
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      // Si la respuesta es exitosa, parsear el JSON
-      final Map<String, dynamic> data = jsonDecode(response.body);
-      final String androidID = data['androidID'];
-      print('Android ID obtenido: $androidID');
-      return androidID; // Devuelve el androidID
-    } else if (response.statusCode == 404) {
-      print('Error: Número de teléfono no encontrado');
-      return null; // Retorna null si no se encuentra
-    } else {
-      print('Error al obtener el Android ID: ${response.statusCode}');
-      return null; // Retorna null en otros casos de error
-    }
-  } catch (e) {
-    print('Error al realizar la solicitud: $e');
-    return null; // Retorna null en caso de excepción
-  }
-}
-
-Future<void> _autoLogin() async {
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  final String? authToken = prefs.getString('authToken');
-  final String? permisionApp = prefs.getString('configPermissions');
-  DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-  AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-
-  final String _tel = prefs.getInt('NumeroTel').toString();
-  print("VALOR DE PERMISOS: $permisionApp");
-  print("VALOR DE TOKEN: $authToken");
-
-  if (authToken != null) {
-    final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/data-protegida');
+  Future<String?> fetchAndroidID(String numeroElemento) async {
+    final url = Uri.parse(
+        '${ConfigBackend.backendUrl}/segucom/api/user/android/$numeroElemento');
+    print('URL: $url');
 
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': authToken,
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        // Obtener el androidID permitido
-        String? androidIDPermitido = await fetchAndroidID(_tel);
-        String androidIDActual = androidInfo.id;
+        // Si la respuesta es exitosa, parsear el JSON
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final String androidID = data['androidID'];
+        print('Android ID obtenido: $androidID');
+        return androidID; // Devuelve el androidID
+      } else if (response.statusCode == 404) {
+        print('Error: Número de teléfono no encontrado');
+        return null; // Retorna null si no se encuentra
+      } else {
+        print('Error al obtener el Android ID: ${response.statusCode}');
+        return null; // Retorna null en otros casos de error
+      }
+    } catch (e) {
+      print('Error al realizar la solicitud: $e');
+      return null; // Retorna null en caso de excepción
+    }
+  }
 
-        // Comparar el androidID permitido con el actual
-        if (androidIDPermitido == androidIDActual) {
-          // Si la respuesta es exitosa, puedes procesar los datos aquí
-          final Map<String, dynamic> userData = jsonDecode(response.body);
-          print('Datos del usuario: $userData');
-          final String _numElemento = prefs.getString('NumeroElemento')!;
+  Future<void> _autoLogin() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? authToken = prefs.getString('authToken');
+    final String? permisionApp = prefs.getString('configPermissions');
+    String? androidID = prefs.getString('AndroidID');
 
-          if (permisionApp != null) {
-            await initializeService();
-            Navigator.pushReplacementNamed(context, '/menu');
+    final String _tel = prefs.getInt('NumeroTel').toString();
+    print("VALOR DE PERMISOS: $permisionApp");
+    print("VALOR DE TOKEN: $authToken");
+
+    if (authToken != null) {
+      final url =
+          Uri.parse(ConfigBackend.backendUrl + '/segucom/api/data-protegida');
+
+      try {
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          // Obtener el androidID permitido
+          String? androidIDPermitido = await fetchAndroidID(_tel);
+          String androidIDActual = androidID.toString();
+          print(androidIDActual);
+          print(androidIDPermitido);
+
+          // Comparar el androidID permitido con el actual
+          if (androidIDPermitido.toString() == androidIDActual.toString()) {
+            // Si la respuesta es exitosa, puedes procesar los datos aquí
+            final Map<String, dynamic> userData = jsonDecode(response.body);
+            print('Datos del usuario: $userData');
+            final String _numElemento = prefs.getString('NumeroElemento')!;
+
+            if (permisionApp != null) {
+              await initializeService();
+              Navigator.pushReplacementNamed(context, '/menu');
+            } else {
+              Navigator.pushReplacementNamed(context, '/permision');
+            }
           } else {
-            Navigator.pushReplacementNamed(context, '/permision');
+            Navigator.pushReplacementNamed(context, '/login');
           }
         } else {
           Navigator.pushReplacementNamed(context, '/login');
+          print(
+              "############## valor de response.statusCode: ${response.statusCode}");
+          print(permisionApp);
         }
-      } else {
-        Navigator.pushReplacementNamed(context, '/login');
-        print("############## valor de response.statusCode: ${response.statusCode}");
-        print(permisionApp);
+      } catch (e) {
+        print('Error en la solicitud HTTP: $e');
+        Navigator.pushReplacementNamed(context, '/config');
       }
-    } catch (e) {
-      print('Error en la solicitud HTTP: $e');
-      Navigator.pushReplacementNamed(context, '/config');
-    }
-  } else {
-    // Si no hay un token aún
-    if (permisionApp == null) {
-      Navigator.pushReplacementNamed(context, '/permision');
     } else {
-      Navigator.pushReplacementNamed(context, '/config');
+      // Si no hay un token aún
+      if (permisionApp == null) {
+        Navigator.pushReplacementNamed(context, '/permision');
+      } else {
+        Navigator.pushReplacementNamed(context, '/config');
+      }
     }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {

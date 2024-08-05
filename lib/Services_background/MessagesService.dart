@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:segucom_app/configBackend.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,7 @@ class MessageService {
   late IO.Socket socket;
   late String _numElemento;
   String? lastMessageId;
+  
 
   MessageService(this._numElemento) {
     initializeSocket();
@@ -154,7 +156,7 @@ class MessageService {
     }
   }
 
-  void _onReceivedCallRequest(dynamic data) {
+  Future<void> _onReceivedCallRequest(dynamic data) async {
   // Imprimir el mensaje recibido
   print('Nueva solicitud de llamada recibida desde el servidor: $data');
 
@@ -178,7 +180,15 @@ class MessageService {
         "Solicitud de llamada",
         "Ingresa al chat de: $callerName ($callerNumber)"
       );
+    //crear un prefs para guardar el numero y nombre de la persona que esta llamando
+ 
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+prefs.setString('requestCalling', 'true');
+prefs.setString('callerName', callerName);
+prefs.setString('callerNumber', callerNumber);
+print("Datos de llamada guardados: $callerName, $callerNumber");
 
+     
       // Reproducir sonido y vibrar simultáneamente
       _playRingtoneAndVibrate();
     }

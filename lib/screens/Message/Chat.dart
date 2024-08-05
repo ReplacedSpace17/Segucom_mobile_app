@@ -11,6 +11,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/main.dart';
+import 'package:segucom_app/screens/Message/ScreenListChats.dart';
 import 'package:segucom_app/screens/Message/screensCalls/VideoCalling.dart';
 import 'package:segucom_app/screens/Message/screensCalls/VoiceCalling.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,6 +50,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecording = false;
   bool _isPlaying = false;
   String _filePath = '';
+bool _isUploading = false; // Variable para controlar el estado de carga
+
+Map<int, bool> _isPlayingMap = {};
 
 //llamadas
   final _localRenderer = RTCVideoRenderer();
@@ -71,6 +75,11 @@ class _ChatScreenState extends State<ChatScreen> {
   String _callerNumber = "477";
 
   Future<void> _initialize() async {
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+prefs.setString('requestCalling', 'false');
+
+
     await _recorder.openRecorder();
     await _player.openPlayer();
 
@@ -552,12 +561,13 @@ print("########################################################## UserId2: ${wid
     }
   }
 
-  Future<void> _stopPlaying() async {
-    await _player.stopPlayer();
-    setState(() {
-      _isPlaying = false;
-    });
-  }
+Future<void> _stopPlaying(int messageId) async {
+  await _player.stopPlayer();
+  setState(() {
+    _isPlayingMap[messageId] = false; // Cambiar solo el estado del mensaje actual
+  });
+}
+
 
 ////////////////////////
 
@@ -626,6 +636,7 @@ print("########################################################## UserId2: ${wid
 
         if (data.isNotEmpty) {
           List<dynamic> mensajes = data[0]['MENSAJES'];
+          print(mensajes);
           DATA_Chat_Fetch = data;
           if (mounted) {
             setState(() {
@@ -754,72 +765,68 @@ void _handleReceivedMessage(dynamic data) {
     }
   }
 
-  Future<void> _sendMediaMessage(String filePath, String fileType) async {
-    var currentDate = DateTime.now();
-    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+Future<void> _sendMediaMessage(String filePath, String fileType) async {
+  setState(() {
+    _isUploading = true; // Iniciar carga
+  });
 
-    var requestBody = {
-      "FECHA": formattedDate,
-      "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
-      "MENSAJE": '',
-      "MEDIA": filePath,
-      "TIPO_MEDIA": fileType,
-      "UBICACION": "NA"
-    };
+  var currentDate = DateTime.now();
+  var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
-    var url =
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
+  var requestBody = {
+    "FECHA": formattedDate,
+    "RECEPTOR": widget.chatData['ELEMENTO_NUM'],
+    "MENSAJE": '',
+    "MEDIA": filePath,
+    "TIPO_MEDIA": fileType,
+    "UBICACION": "NA"
+  };
 
-    try {
-      // Convertir el requestBody a formato JSON
-      var requestBodyJson = jsonEncode(requestBody);
+  var url =
+      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/image/${widget.numElemento}/${widget.chatData['ELEMENTO_NUM']}';
 
-      // Preparar la solicitud HTTP con la imagen y el requestBody
-      var request = http.MultipartRequest('POST', Uri.parse(url));
-      request.files.add(await http.MultipartFile.fromPath('image', filePath));
-      request.fields['data'] =
-          requestBodyJson; // Incluir el requestBody como campo
+  try {
+    var requestBodyJson = jsonEncode(requestBody);
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+    request.files.add(await http.MultipartFile.fromPath('image', filePath));
+    request.fields['data'] = requestBodyJson;
 
-      // Enviar la solicitud y obtener la respuesta
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
-        var responseData = json.decode(response.body);
-        var imageUrl = responseData[
-            'imageUrl']; // Asegúrate de verificar el campo de respuesta
+    if (response.statusCode == 200) {
+      var responseData = json.decode(response.body);
+      var imageUrl = responseData['imageUrl'];
 
-        // Concatenar la URL con el backend
-
-        print(imageUrl);
-        var newMessage = {
-          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
-          'FECHA': formattedDate,
-          'REMITENTE': widget.numElemento,
-          'MENSAJE':
-              '', // Asegúrate de convertir imageUrl a String si es necesario
-          'MEDIA': 'IMAGE',
-          'UBICACION':
-              imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
-          'to': widget.chatData['ELEMENTO_NUM'],
-          'NOMBRE': _callerName
-        };
-        socket.emit('sendMessage', newMessage);
-        // Agregar el mensaje enviado a la lista messages
-        if (mounted) {
-          setState(() {
-            messages.add(newMessage);
-          });
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => _scrollToBottom());
-        }
-      } else {
-        throw Exception('Failed to send media message');
+      print(imageUrl);
+      var newMessage = {
+        'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+        'FECHA': formattedDate,
+        'REMITENTE': widget.numElemento,
+        'MENSAJE': '',
+        'MEDIA': 'IMAGE',
+        'UBICACION': imageUrl.toString(),
+        'to': widget.chatData['ELEMENTO_NUM'],
+        'NOMBRE': _callerName
+      };
+      socket.emit('sendMessage', newMessage);
+      if (mounted) {
+        setState(() {
+          messages.add(newMessage);
+          _isUploading = false; // Finalizar carga
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
-    } catch (e) {
-      print('Error sending media message: $e');
+    } else {
+      throw Exception('Failed to send media message');
     }
+  } catch (e) {
+    print('Error sending media message: $e');
+    setState(() {
+      _isUploading = false; // Finalizar carga en caso de error
+    });
   }
+}
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -835,12 +842,15 @@ void _handleReceivedMessage(dynamic data) {
       curve: Curves.easeOut,
     );
   }
-
 Widget _buildMessage(Map<String, dynamic> message) {
   bool isMe = message['REMITENTE'].toString() == widget.numElemento;
   bool isMedia = message.containsKey('MEDIA') && message['MEDIA'] == 'IMAGE';
   bool isAudio = message.containsKey('MEDIA') && message['MEDIA'] == 'AUDIO';
   String messageText = message['MENSAJE'];
+  int messageId = message['MENSAJE_ID'];
+
+  // Inicializa el estado de reproducción si no existe en el mapa
+  _isPlayingMap.putIfAbsent(messageId, () => false);
 
   return Align(
     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -876,8 +886,8 @@ Widget _buildMessage(Map<String, dynamic> message) {
                         child: Image.network(
                           '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                           fit: BoxFit.contain,
-                          width: double.infinity, // Ajusta el ancho
-                          height: 400, // Ajusta la altura
+                          width: double.infinity,
+                          height: 400,
                         ),
                       ),
                     );
@@ -896,7 +906,7 @@ Widget _buildMessage(Map<String, dynamic> message) {
               children: [
                 Expanded(
                   child: Text(
-                    _isPlaying ? 'Reproduciendo' : 'Mensaje de voz',
+                    _isPlayingMap[messageId]! ? 'Reproduciendo' : 'Mensaje de voz',
                     style: TextStyle(
                       color: isMe ? Colors.white : Colors.black,
                     ),
@@ -904,26 +914,25 @@ Widget _buildMessage(Map<String, dynamic> message) {
                 ),
                 IconButton(
                   icon: Icon(
-                    _isPlaying ? Icons.stop : Icons.play_arrow,
+                    _isPlayingMap[messageId]! ? Icons.stop : Icons.play_arrow,
                     color: isMe ? Colors.white : Colors.black,
                   ),
                   onPressed: () async {
-                    if (_isPlaying) {
-                      await _stopPlaying();
+                    if (_isPlayingMap[messageId]!) {
+                      await _stopPlaying(messageId);
                     } else {
                       // Reproducir el audio
-                      print(
-                          'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
+                      print('REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
                       await _player.startPlayer(
                         fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
                         whenFinished: () {
                           setState(() {
-                            _isPlaying = false;
+                            _isPlayingMap[messageId] = false; // Cambiar el estado del mensaje actual
                           });
                         },
                       );
                       setState(() {
-                        _isPlaying = true;
+                        _isPlayingMap[messageId] = true; // Cambiar el estado del mensaje actual
                       });
                     }
                   },
@@ -948,6 +957,7 @@ Widget _buildMessage(Map<String, dynamic> message) {
     ),
   );
 }
+
   
 Widget _buildDateSeparator(String date) {
   DateTime dateTime = DateTime.parse(date);
@@ -968,8 +978,18 @@ Widget _buildDateSeparator(String date) {
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
+      automaticallyImplyLeading: false, // Elimina la flecha de retroceso por defecto
       title: Row(
         children: [
+          IconButton(
+            icon: Icon(Icons.arrow_back), // Flecha de retroceso
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => ChatListScreen()),
+              );
+            },
+          ),
           CircleAvatar(
             backgroundImage: AssetImage('lib/assets/icons/contact.png'),
             radius: 20,
@@ -1005,32 +1025,36 @@ Widget build(BuildContext context) {
               : ListView.builder(
                   controller: _scrollController,
                   itemCount: messages.length,
-itemBuilder: (context, index) {
-  var message = messages[index];
-  bool showDateSeparator = false;
+                  itemBuilder: (context, index) {
+                    var message = messages[index];
+                    bool showDateSeparator = false;
 
-  if (index == 0) {
-    // Muestra el separador para el primer mensaje
-    showDateSeparator = true;
-  } else {
-    String prevMessageDate =
-        messages[index - 1]['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    String currentMessageDate =
-        message['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    showDateSeparator = prevMessageDate != currentMessageDate; // Compara las fechas
-  }
+                    if (index == 0) {
+                      // Muestra el separador para el primer mensaje
+                      showDateSeparator = true;
+                    } else {
+                      String prevMessageDate =
+                          messages[index - 1]['FECHA'].split(' ')[0]; // Extrae solo la fecha
+                      String currentMessageDate =
+                          message['FECHA'].split(' ')[0]; // Extrae solo la fecha
+                      showDateSeparator = prevMessageDate != currentMessageDate; // Compara las fechas
+                    }
 
-  return Column(
-    children: [
-      if (showDateSeparator)
-        _buildDateSeparator(message['FECHA']), // Mostrar separador solo si es necesario
-      _buildMessage(message), // Construir el mensaje
-    ],
-  );
-}
-
+                    return Column(
+                      children: [
+                        if (showDateSeparator)
+                          _buildDateSeparator(message['FECHA']), // Mostrar separador solo si es necesario
+                        _buildMessage(message), // Construir el mensaje
+                      ],
+                    );
+                  },
                 ),
         ),
+        if (_isUploading) // Muestra el loader si está subiendo
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Center(child: CircularProgressIndicator()),
+          ),
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
@@ -1050,13 +1074,11 @@ itemBuilder: (context, index) {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20.0),
                       borderSide: BorderSide(
-                        color: Color.fromARGB(
-                            255, 17, 55, 95), // Color del borde
+                        color: Color.fromARGB(255, 17, 55, 95), // Color del borde
                         width: 2.0, // Ancho del borde
                       ),
                     ),
-                    contentPadding: EdgeInsets.symmetric(
-                        vertical: 10.0, horizontal: 15.0),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 15.0),
                     suffixIcon: IconButton(
                       icon: Icon(Icons.photo),
                       onPressed: _pickImage,
@@ -1101,5 +1123,6 @@ itemBuilder: (context, index) {
     ),
   );
 }
+
 
 }

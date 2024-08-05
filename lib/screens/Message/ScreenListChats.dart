@@ -33,16 +33,61 @@ class _ChatListScreenState extends State<ChatListScreen> {
   late Future<List<dynamic>> futureChats;
   late Future<List<dynamic>> futureChatsGroups;
   String _numElemento = '';
+  String _searchQuery = '';
+
+  List<dynamic> allChats = [];
+  List<dynamic> allChatsGroups = [];
+
+  String requestCall = '';
+  String requestCallName = '';
+  String requestCallNumber = '';
 
   @override
   void initState() {
     super.initState();
+    getCallerInfo();
     _loadNumElemento().then((_) {
       setState(() {
         futureChats = fetchChats();
         futureChatsGroups = fetchChatsGroups();
       });
     });
+  }
+
+//cargar request de llamadas
+  // Método para obtener los datos guardados
+// Pantalla donde obtienes los datos
+  Future<void> getCallerInfo() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    String? requestCalling = prefs.getString('requestCalling');
+    String? callerName = prefs.getString('callerName');
+    String? callerNumber = prefs.getString('callerNumber');
+
+    print("Datos obtenidos:");
+    print("requestCalling: $requestCalling");
+    print("callerName: $callerName");
+    print("callerNumber: $callerNumber");
+
+    if (requestCalling == 'true') {
+      print("Hay llamadas en curso pendientes");
+      setState(() {
+        requestCall =
+            'true'; // Actualiza el estado a 'true' si hay una llamada en curso
+        requestCallName = callerName ?? ''; // Nombre del llamador
+        requestCallNumber = callerNumber ?? ''; // Número del llamador
+      });
+      if (requestCalling == 'false') {
+        setState(() {
+          requestCall = 'false'; // Actualiza el estado a 'false' si no hay llamadas en curso
+        });
+
+      }
+      print('Nombre del llamador: $requestCallName');
+      print('Número del llamador: $requestCallNumber');
+    } else {
+      print('No hay llamadas en curso');
+    }
   }
 
   Future<void> _loadNumElemento() async {
@@ -62,7 +107,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
-      
+      print(data);
+      allChats = data; // Almacenar todos los chats
+
       return data
           .map((chat) => {
                 'ELEMENTO_NUM': chat['ELEMENTO_NUM'],
@@ -87,15 +134,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
-      print(data);
-      data.forEach((chat) {
-        print('ELEMENTO_NUM: ${chat['ELEMENTO_NUM']}');
-        print('GRUPO_DESCRIP: ${chat['GRUPO_DESCRIP']}');
-        print(
-            'ULTIMO_MENSAJE: ${chat['MENSAJES'].isNotEmpty ? chat['MENSAJES'].last['MENSAJE'] : 'No hay mensajes'}');
-        // Agregar 'ID_GRUPO
-        print('ID_GRUPO: ${chat['GRUPO_ID']}');
-      });
+      allChatsGroups = data; // Almacenar todos los chats de grupo
 
       return data
           .map((chat) => {
@@ -112,130 +151,197 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
+  void _filterChats(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
   Future<void> _refreshChats() async {
     setState(() {
       futureChats = fetchChats();
       futureChatsGroups = fetchChatsGroups();
     });
   }
+
 @override
 Widget build(BuildContext context) {
   return Scaffold(
     appBar: AppBar(
       title: Text('Chats'),
     ),
-    body: RefreshIndicator(
-      onRefresh: _refreshChats,
-      child: FutureBuilder<List<dynamic>>(
-        future: Future.wait([futureChats, futureChatsGroups]),
-        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData ||
-              (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
-            return Center(child: Text('No hay chats disponibles'));
-          } else {
-            List<dynamic> chats = snapshot.data![0];
-            List<dynamic> chatsGroups = snapshot.data![1];
-
-            return ListView.builder(
-              itemCount: chats.length + chatsGroups.length,
-              itemBuilder: (context, index) {
-                if (index < chats.length) {
-                  var chat = chats[index];
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: Image.asset(
-                          'lib/assets/icons/contact.png',
-                          width: 48,
-                          height: 48,
-                        ),
-                        title: Text(
-                          '${chat['NOMBRE_COMPLETO']}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text('${chat['ULTIMO_MENSAJE']}'),
-                        onTap: () async {
-                          // Navegar a ChatScreen y esperar resultado
-                          var result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(
-                                chatData: chat,
-                                numElemento: _numElemento,
-                              ),
-                            ),
-                          );
-
-                          // Actualizar la lista de chats si se envió un mensaje
-                          if (result != null && result is bool && result) {
-                            setState(() {
-                              futureChats = fetchChats();
-                            });
-                          }
-                        },
-                      ),
-                      Divider(
-                        color: Colors.grey,
-                        thickness: 1.0,
-                        indent: 16.0,
-                        endIndent: 16.0,
-                      ),
-                    ],
-                  );
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            width: 350, // Ajusta el ancho según sea necesario
+            child: TextField(
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Color(0xFFDCDCDC).withOpacity(0.12), // Fondo con 12% de opacidad
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                  borderSide: BorderSide(color: Colors.black.withOpacity(0.12)), // Contorno con 12% de opacidad
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                  borderSide: BorderSide(color: Colors.black.withOpacity(0.12)), // Contorno al enfocar
+                ),
+                labelText: 'Buscar',
+                contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0), // Ajustar el padding
+              ),
+              onChanged: _filterChats,
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshChats,
+            child: FutureBuilder<List<dynamic>>(
+              future: Future.wait([futureChats, futureChatsGroups]),
+              builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else if (!snapshot.hasData || (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
+                  return Center(child: Text('No hay chats disponibles'));
                 } else {
-                  var chatGroup = chatsGroups[index - chats.length];
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: Image.asset(
-                          'lib/assets/icons/contact.png',
-                          width: 48,
-                          height: 48,
-                        ),
-                        title: Text(
-                          '${chatGroup['NOMBRE_COMPLETO']}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
-                        onTap: () async {
-                          // Navegar a ChatScreen y esperar resultado
-                          var result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreenGroup(
-                                chatData: chatGroup,
-                                numElemento: _numElemento,
-                                idGrupo: chatGroup['GRUPO_ID'].toString(),
+                  List<dynamic> chats = snapshot.data![0];
+                  List<dynamic> chatsGroups = snapshot.data![1];
+
+                  // Filtrar chats
+                  var filteredChats = chats
+                      .where((chat) => chat['NOMBRE_COMPLETO'].toLowerCase().contains(_searchQuery.toLowerCase()))
+                      .toList();
+
+                  // Filtrar grupos
+                  var filteredChatsGroups = chatsGroups
+                      .where((chatGroup) => chatGroup['NOMBRE_COMPLETO'].toLowerCase().contains(_searchQuery.toLowerCase()))
+                      .toList();
+
+                  // Verificar si hay una solicitud de llamada y mover ese chat al principio
+                  if (requestCall == 'true') {
+                    filteredChats.sort((a, b) {
+                      if (a['NOMBRE_COMPLETO'] == requestCallName) return -1; // Mover al principio
+                      if (b['NOMBRE_COMPLETO'] == requestCallName) return 1; // Mover al final
+                      return 0; // Mantener orden original
+                    });
+                  }
+
+                  return ListView.builder(
+                    itemCount: filteredChats.length + filteredChatsGroups.length,
+                    itemBuilder: (context, index) {
+                      if (index < filteredChats.length) {
+                        var chat = filteredChats[index];
+                        bool isRequestCall = requestCall == 'true' && chat['NOMBRE_COMPLETO'] == requestCallName;
+
+                        return Column(
+                          children: [
+                            Container(
+                              color: isRequestCall ? Colors.blue : Colors.transparent, // Color de fondo azul si hay solicitud de llamada
+                              child: ListTile(
+                                leading: Image.asset(
+                                  'lib/assets/icons/contact.png',
+                                  width: 48,
+                                  height: 48,
+                                ),
+                                title: Text(
+                                  isRequestCall ? '${chat['NOMBRE_COMPLETO']}' : '${chat['NOMBRE_COMPLETO']}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isRequestCall ? Colors.white : Colors.black, // Cambiar color de texto si hay solicitud de llamada
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  isRequestCall ? 'LLAMADA SOLICITADA' :  '${chat['ULTIMO_MENSAJE']}',
+                                 
+                                  style: TextStyle(color: isRequestCall ? Colors.white70 : Colors.black54),
+                                ),
+                           onTap: () async {
+  // Navegar a ChatScreen y esperar resultado
+  var result = await Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ChatScreen(
+        chatData: chat,
+        numElemento: _numElemento,
+      ),
+    ),
+  );
+
+  // Actualizar la lista de chats si se envió un mensaje
+  if (result != null && result is bool && result) {
+    setState(() {
+      futureChats = fetchChats();
+    });
+  }
+},
+
                               ),
                             ),
-                          );
+                            Divider(
+                              color: Colors.grey,
+                              thickness: 1.0,
+                              indent: 16.0,
+                              endIndent: 16.0,
+                            ),
+                          ],
+                        );
+                      } else {
+                        var chatGroup = filteredChatsGroups[index - filteredChats.length];
+                        return Column(
+                          children: [
+                            ListTile(
+                              leading: Image.asset(
+                                'lib/assets/icons/chatGroup.png',
+                                width: 48,
+                                height: 48,
+                              ),
+                              title: Text(
+                                '${chatGroup['NOMBRE_COMPLETO']}',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
+                              onTap: () async {
+                                // Navegar a ChatScreenGroup y esperar resultado
+                                var result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatScreenGroup(
+                                      chatData: chatGroup,
+                                      numElemento: _numElemento,
+                                      idGrupo: chatGroup['GRUPO_ID'].toString(),
+                                    ),
+                                  ),
+                                );
 
-                          // Actualizar la lista de chats si se envió un mensaje
-                          if (result != null && result is bool && result) {
-                            setState(() {
-                              futureChatsGroups = fetchChatsGroups();
-                            });
-                          }
-                        },
-                      ),
-                      Divider(
-                        color: Colors.grey,
-                        thickness: 1.0,
-                        indent: 16.0,
-                        endIndent: 16.0,
-                      ),
-                    ],
+                                // Actualizar la lista de chats si se envió un mensaje
+                                if (result != null && result is bool && result) {
+                                  setState(() {
+                                    futureChatsGroups = fetchChatsGroups();
+                                  });
+                                }
+                              },
+                            ),
+                            Divider(
+                              color: Colors.grey,
+                              thickness: 1.0,
+                              indent: 16.0,
+                              endIndent: 16.0,
+                            ),
+                          ],
+                        );
+                      }
+                    },
                   );
                 }
               },
-            );
-          }
-        },
-      ),
+            ),
+          ),
+        ),
+      ],
     ),
     floatingActionButton: FloatingActionButton(
       onPressed: () {

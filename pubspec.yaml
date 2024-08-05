@@ -68,6 +68,8 @@ dependencies:
   video_player: ^2.9.1
   dio: ^5.5.0+1
   video_thumbnail: ^0.5.3
+  uuid: ^4.4.2
+  
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +81,14 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/assets/appIcon/icon.png"
+
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -88,6 +98,7 @@ flutter:
 
   uses-material-design: true
   assets:
+    - lib/assets/appIcon/icon.png
     - lib/assets/fondoSplash.jpg
     - lib/assets/fondoWhite.png
     - lib/assets/logo.png
@@ -98,6 +109,7 @@ flutter:
     - lib/assets/icons/admin.png
     - lib/assets/icons/clock.png
     - lib/assets/icons/contact.png
+    - lib/assets/icons/chatGroup.png
     - lib/assets/icons/miPerfil.png
     - lib/assets/icons/MenuIcons/Home.svg
     - lib/assets/icons/password.png

@@ -66,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
 Future<void> _loginUser(String phone, String password) async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-  AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+  String? androidID = prefs.getString('AndroidID');
 
   final url = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/login');
   print('URL: $url');
@@ -78,11 +78,11 @@ Future<void> _loginUser(String phone, String password) async {
     body: jsonEncode({
       "telefono": phone,
       "clave": password,
-      "androidID": androidInfo.id
+      "androidID": androidID
     }),
   );
 
-  print("Validando " + androidInfo.id);
+ 
   
   if (response.statusCode == 200) {
     // Parsear la respuesta JSON
@@ -100,7 +100,7 @@ Future<void> _loginUser(String phone, String password) async {
     prefs.setInt('NumeroTel', telefono);
     prefs.setString('Name', nombre);
     prefs.setString('NumeroElemento', elementoNum);
-    prefs.setString('AndroidID', androidInfo.id);
+    prefs.setString('AndroidID', androidID.toString());
 
     // Inicio de sesión exitoso
     print('Inicio de sesión exitoso');
@@ -356,7 +356,7 @@ Widget build(BuildContext context) {
                               );
                             },
                             child: Text(
-                              'Solicitud de cambio del Android ID',
+                              'Solicitud de cambio de dispositivo',
                               style: TextStyle(
                                 fontWeight: FontWeight.w300,
                                 color: Colors.white,
