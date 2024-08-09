@@ -299,7 +299,7 @@ Widget build(BuildContext context) {
                             ),
                             onPressed: _onLoginButtonPressed,
                             child: Text(
-                              'INICIAR SESIÓN',
+                              'Iniciar Sesión',
                               style: TextStyle(
                                 fontWeight: FontWeight.w300,
                                 color: Colors.white,
@@ -309,32 +309,7 @@ Widget build(BuildContext context) {
                           ),
                         ),
                         // Botón para crear cuenta
-                        Container(
-                          margin: EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 10),
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF073560),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              padding: EdgeInsets.symmetric(vertical: 16.0),
-                            ),
-                            onPressed: () {
-                              // Navegar a la pantalla de registro
-                              Navigator.pushNamed(context, '/register');
-                            },
-                            child: Text(
-                              'Crear cuenta',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w300,
-                                color: Colors.white,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                        ),
+                        
                         // Botón para solicitud de cambio de Android ID
                         Container(
                           margin: EdgeInsets.symmetric(
@@ -356,7 +331,7 @@ Widget build(BuildContext context) {
                               );
                             },
                             child: Text(
-                              'Solicitud de cambio de dispositivo',
+                              'Enlazar a dispositivo',
                               style: TextStyle(
                                 fontWeight: FontWeight.w300,
                                 color: Colors.white,

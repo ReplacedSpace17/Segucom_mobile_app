@@ -33,6 +33,7 @@ class _MenuScreenState extends State<MenuScreen> {
   String _numElemento = '';
   String _tel = '';
   int _selectedIndex = 0;
+  Timer? _timerNotificaciones;
 
   //numero de consignas y boletines no leidos
   int _numConsignas = 0;
@@ -64,7 +65,10 @@ class _MenuScreenState extends State<MenuScreen> {
 
     // Iniciar el listener para cambios en el volumen
 
-    
+    // Iniciar el Timer para actualizaciones cada 3 segundos
+    _timerNotificaciones = Timer.periodic(Duration(seconds: 2), (timer) {
+      _getNotifications(); // Llamar a la función cada 3 segundos
+    });
     // Configurar el listener para cambios en el volumen
     
   }
