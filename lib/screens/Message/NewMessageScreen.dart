@@ -175,7 +175,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   Future<Map<String, dynamic>> fetchChatForUser(String elementoNumero) async {
     // Intenta obtener los mensajes para el usuario
     final response = await http.get(Uri.parse(
-        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/$elementoNumero'));
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/newmessage/$_numElemento/$elementoNumero'));
 
     // Si la respuesta es exitosa y contiene datos, procese los mensajes
     if (response.statusCode == 200) {
