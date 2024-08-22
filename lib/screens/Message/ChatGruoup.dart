@@ -853,7 +853,7 @@ Future<void> _downloadVideo(String url, int messageId) async {
 
 void _playVideo(String videoPath) {
   _videoController = VideoPlayerController.file(File(videoPath))
-    ..setLooping(true) // Omitir si no es necesario
+    ..setLooping(false) // Omitir si no es necesario
     ..initialize().then((_) {
       // Comienza la reproducción inmediatamente después de inicializar
       _videoController.play();

@@ -163,33 +163,72 @@ Container(
     );
   }
 
- Future<void> _scanQR(BuildContext context) async {
-    try {
-      String result = await FlutterBarcodeScanner.scanBarcode(
-          "#ff6666", "Cancelar", true, ScanMode.QR);
-      if (result != "-1") {
-        // Verificar si el resultado del QR es un número entre 0 y 89999
-        int? numeroElemento = int.tryParse(result);
-        if (numeroElemento != null && numeroElemento >= 0 && numeroElemento <= 89999) {
+
+
+Future<void> _scanQR(BuildContext context) async {
+  try {
+    print("Iniciando escaneo de QR...");
+
+    String result = await FlutterBarcodeScanner.scanBarcode(
+        "#ff6666", "Cancelar", true, ScanMode.QR);
+    
+    print("Resultado del escaneo: $result");
+
+    if (result != "-1") {
+      int? numeroElemento = int.tryParse(result);
+      print("Número parseado del QR: $numeroElemento");
+      
+      if (numeroElemento != null && numeroElemento >= 0 && numeroElemento <= 89999) {
+        print("Número de elemento dentro del rango válido.");
+
+        // Imprimir la lista de elementos para depuración
+        print("Lista de elementos:");
+        for (var elemento in elementos) {
+          print("Elemento: ${elemento.numeroElemento}");
+        }
+
+        // Imprimir la lista de elementos presentes para depuración
+        print("Lista de elementos presentes:");
+        print(elementosPresentes);
+
+        // Primero verifica si el número de elemento ya ha sido escaneado
+        if (elementosPresentes.contains(numeroElemento)) {
+          // Si el elemento ya ha sido escaneado, mostrar una alerta
+          print("El elemento $numeroElemento ya ha sido escaneado.");
+          _mostrarAlerta(context, "Este elemento ya ha sido escaneado.");
+        } else {
           // Verificar si el número de elemento está en la lista de elementos
-          if (elementos.any((elemento) => elemento.numeroElemento == numeroElemento)) {
+          bool elementoExiste = elementos.any((elemento) => elemento.numeroElemento == numeroElemento);
+          print("¿Elemento existe en la lista?: $elementoExiste");
+
+          if (elementoExiste) {
+            print("El elemento $numeroElemento es nuevo.");
             setState(() {
               qrResult = result;
+              elementosPresentes.add(numeroElemento);
             });
             _mostrarQRResult(context);
-            _actualizarElementosPresentes(numeroElemento);
             _eliminarElemento(numeroElemento);
           } else {
+            print("El QR $result no corresponde a un elemento del grupo.");
             _mostrarAlerta(context, "El QR no corresponde a un elemento del grupo.");
           }
-        } else {
-          _mostrarAlerta(context, "El QR escaneado no es válido.");
         }
+      } else {
+        print("El QR escaneado no es válido: $result");
+        _mostrarAlerta(context, "El QR escaneado no es válido.");
       }
-    } catch (e) {
-      _mostrarAlerta(context, "Error al escanear el QR: $e");
+    } else {
+      print("Escaneo cancelado o error en el resultado: $result");
     }
+  } catch (e) {
+    print("Error al escanear el QR: $e");
+    _mostrarAlerta(context, "Error al escanear el QR: $e");
   }
+}
+
+
+
 
   void _actualizarElementosPresentes(int numeroElemento) {
     setState(() {
