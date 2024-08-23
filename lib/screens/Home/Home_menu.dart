@@ -328,7 +328,9 @@ Future<void> obtenerNombreCompleto() async {
                                   url:
                                       //'https://segucom.mx/fotos/viewFotos.html?category=Boletines&id_data=2',
                                       'https://www.segucom.mx/web/grid_ALERTA_MOVIL/?xElemen=$_numElemento',
-                                  title: 'Boletinaje')),
+                                      //'https://segubackend.com/backend/uploads/boletines/2024/08/1724372848303.pdf',
+                                      //'https://segubackend.com/backend/fotos/view?category=boletines&id_data=17',
+                                  title: 'Boletines')),
                         );
                       },
                     ),

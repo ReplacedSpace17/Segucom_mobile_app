@@ -52,6 +52,7 @@ class VolumeService {
   }
 
   Future<void> _showPanicAlert() async {
+    NotificationController.createNewNotification("Botón de pánico", "Se ha enviado una alerta ");
     _currentDateTime = DateTime.now();
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -92,7 +93,7 @@ class VolumeService {
         if (response.statusCode == 201) {
           // NotificationController.createNewNotification("Hola", "Ubicacion enviada");
           print('Alerta enviada al servidor');
-          //NotificationController.createNewNotification("Hola", "BOTON");
+          
           VolumeWatcher.setVolume(0.6);
         } else {
           print('Error al enviar alerta: ${response.statusCode}');
