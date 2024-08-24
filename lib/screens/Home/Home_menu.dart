@@ -70,33 +70,35 @@ class _MenuScreenState extends State<MenuScreen> {
       _getNotifications(); // Llamar a la función cada 3 segundos
     });
     // Configurar el listener para cambios en el volumen
-    
   }
 
-Future<void> obtenerNombreCompleto() async {
-  // Obtiene la instancia de SharedPreferences
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  
-  // Recupera el número de teléfono
-  final String _tel = prefs.getInt('NumeroTel').toString();
-  
-  // Crea la URL
-  final urlNombre = Uri.parse(ConfigBackend.backendUrl + '/segucom/api/user/nombre/$_tel');
+  Future<void> obtenerNombreCompleto() async {
+    // Obtiene la instancia de SharedPreferences
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
 
-  // Realiza la solicitud HTTP
-  final nombreResponse = await http.get(urlNombre);
+    // Recupera el número de teléfono
+    final String _tel = prefs.getInt('NumeroTel').toString();
 
-  if (nombreResponse.statusCode == 200) {
-    final Map<String, dynamic> nombreData = jsonDecode(nombreResponse.body);
-    final String nombreCompleto = nombreData['nombreCompleto'];
-  print("NOMBRE BD:" +nombreCompleto);
-    // Almacena el nombre completo en SharedPreferences
-    await prefs.setString('NombreBD', nombreCompleto);
-  } else {
-    // Manejo de errores, puedes lanzar una excepción o imprimir un mensaje
-    throw Exception('Error al obtener el nombre: ${nombreResponse.statusCode}');
+    // Crea la URL
+    final urlNombre =
+        Uri.parse(ConfigBackend.backendUrl + '/segucom/api/user/nombre/$_tel');
+
+    // Realiza la solicitud HTTP
+    final nombreResponse = await http.get(urlNombre);
+
+    if (nombreResponse.statusCode == 200) {
+      final Map<String, dynamic> nombreData = jsonDecode(nombreResponse.body);
+      final String nombreCompleto = nombreData['nombreCompleto'];
+      print("NOMBRE BD:" + nombreCompleto);
+      // Almacena el nombre completo en SharedPreferences
+      await prefs.setString('NombreBD', nombreCompleto);
+      
+    } else {
+      // Manejo de errores, puedes lanzar una excepción o imprimir un mensaje
+      throw Exception(
+          'Error al obtener el nombre: ${nombreResponse.statusCode}');
+    }
   }
-}
 
   Future<void> _getNotifications() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -114,10 +116,12 @@ Future<void> obtenerNombreCompleto() async {
       final body = jsonDecode(response.body);
       print(body);
       //set a numConsignas y numBoletines
-      setState(() {
-        _numConsignas = body['Consignas'];
-        _numBoletines = body['Boletines'];
-      });
+      if (mounted) {
+        setState(() {
+          _numConsignas = body['Consignas'];
+          _numBoletines = body['Boletines'];
+        });
+      }
       String mensaje = "Consignas: " +
           _numConsignas.toString() +
           " Boletines: " +
@@ -152,7 +156,6 @@ Future<void> obtenerNombreCompleto() async {
   @override
   void dispose() {
     _timer?.cancel();
-    
 
     super.dispose();
   }
@@ -249,7 +252,7 @@ Future<void> obtenerNombreCompleto() async {
         );
         break;
       case 2:
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => ChatListScreen()),
         );
@@ -328,8 +331,8 @@ Future<void> obtenerNombreCompleto() async {
                                   url:
                                       //'https://segucom.mx/fotos/viewFotos.html?category=Boletines&id_data=2',
                                       'https://www.segucom.mx/web/grid_ALERTA_MOVIL/?xElemen=$_numElemento',
-                                      //'https://segubackend.com/backend/uploads/boletines/2024/08/1724372848303.pdf',
-                                      //'https://segubackend.com/backend/fotos/view?category=boletines&id_data=17',
+                                  //'https://segubackend.com/backend/uploads/boletines/2024/08/1724372848303.pdf',
+                                  //'https://segubackend.com/backend/fotos/view?category=boletines&id_data=17',
                                   title: 'Boletines')),
                         );
                       },
@@ -620,7 +623,4 @@ Future<void> obtenerNombreCompleto() async {
   }
 
   /////////////////////////////////////////////////////////////////////////////// boton de panico
-  
-
-  
 }

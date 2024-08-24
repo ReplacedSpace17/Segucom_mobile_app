@@ -130,6 +130,8 @@ prefs.setString('requestCalling', 'false');
     setState(() {
       _callerName = prefs.getString('NombreBD') ?? '';
     });
+
+    prefs.setString('requestCalling', 'false');
   }
 
   void _loadTelefono() async {
@@ -701,8 +703,13 @@ void _handleReceivedMessage(dynamic data) {
           }
           messages.add(receivedMessage);
         });
-        // Desplazarse al final de la lista de mensajes
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+          // Desplazarse al final de la lista de mensajes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        // Desplazarse solo si aún está montado
+        _scrollToBottom();
+      }
+    });
       }
     }
   } else {

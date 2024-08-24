@@ -72,7 +72,7 @@ class MessageService {
   }
 
   void _onReceiveMessage(data) {
-    print('Nuevo mensaje recibido desde servidor: $data');
+    print('Nuevo mensaje recibido desde SERVICE: $data');
     String? messageId =
         data['messageId']; // Asumiendo que cada mensaje tiene un ID único
 
@@ -186,14 +186,15 @@ class MessageService {
  
     SharedPreferences prefs = await SharedPreferences.getInstance();
 prefs.setString('requestCalling', 'true');
+print("Estableciendo llamada en true");
 prefs.setString('callerName', callerName);
 prefs.setString('callerNumber', callerNumber);
 print("Datos de llamada guardados: $callerName, $callerNumber");
 
      
-      // Reproducir sonido y vibrar simultáneamente
-      _playRingtoneAndVibrate();
-    }
+
+  _playRingtoneAndVibrate();
+  }
 
   } else {
     print('Datos recibidos no son un Map válido.');

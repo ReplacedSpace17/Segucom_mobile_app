@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:segucom_app/screens/Message/ScreenListChats.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -55,14 +56,14 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
   bool _isRecording = false;
   bool _isPlaying = false;
   String _filePath = '';
-bool _isUploading = false; 
-String? _thumbnailPath;
-double? _lastScrollPosition;
+  bool _isUploading = false;
+  String? _thumbnailPath;
+  double? _lastScrollPosition;
 //Map<int, bool> _isPlayingMap = {};
-Map<int, bool> _isPlayingMap = {};
+  Map<int, bool> _isPlayingMap = {};
 
-Map<int, bool> _isVideoDownloading = {};
-Map<int, bool> _isThumbnailGenerating = {};
+  Map<int, bool> _isVideoDownloading = {};
+  Map<int, bool> _isThumbnailGenerating = {};
 
   /// video
   late VideoPlayerController _videoController;
@@ -71,9 +72,9 @@ Map<int, bool> _isThumbnailGenerating = {};
   double _downloadProgress = 0.0;
   String? _localVideoPath;
 
-String? _downloadingMessageId;
+  String? _downloadingMessageId;
 
-bool _isSendingVideo = false; // Agrega esta línea
+  bool _isSendingVideo = false; // Agrega esta línea
 
   Future<void> _initialize() async {
     await _recorder.openRecorder();
@@ -93,6 +94,7 @@ bool _isSendingVideo = false; // Agrega esta línea
   void initState() {
     super.initState();
     getNameRemitenteGroupChat(widget.numElemento);
+
     // Si se pasaron mensajes, usarlos directamente
     if (widget.messages.isNotEmpty) {
       setState(() {
@@ -104,13 +106,20 @@ bool _isSendingVideo = false; // Agrega esta línea
       fetchMessages();
     }
 
-    _initialize(); //inciializar grabador de audio
+    _initialize(); // Inicializar grabador de audio
+
+    // Inicialización del socket
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
+      'autoConnect': true, // Reconexión automática habilitada
+      'reconnection': true,
+      'reconnectionAttempts': 10000, // Número de intentos de reconexión
+      'reconnectionDelay': 2000, // Retraso entre intentos de reconexión (ms)
     });
+
+    // Manejo de eventos del socket
     socket.on('connect', (_) {
       print('Connected to server');
-      // Unir al usuario a un grupo usando widget.idGrupo y widget.numElemento
       if (widget.numElemento.isNotEmpty) {
         socket?.emit('setId', widget.numElemento);
       }
@@ -118,14 +127,14 @@ bool _isSendingVideo = false; // Agrega esta línea
       socket.emit('joinGroup', [widget.idGrupo, widget.numElemento]);
       print('Usuario ${widget.numElemento} unido al grupo ${widget.idGrupo}');
     });
+
     socket.on('receiveMessage', (data) {
-      print('Nuevo mensaje recibido desde servidor: $data');
+      print('Nuevo mensaje recibido desde chat screen: $data');
       _handleReceivedMessage(data);
-      
     });
 
     socket.connect();
-    //fetchMessages();
+    //fetchMessages(); // Si decides llamar a fetchMessages aquí, asegúrate de que no esté duplicado
   }
 
   @override
@@ -134,14 +143,17 @@ bool _isSendingVideo = false; // Agrega esta línea
     _recorder.closeRecorder();
     _player.closePlayer();
 
-// Liberar el controlador de video si está inicializado
+    // Liberar el controlador de video si está inicializado
     if (_videoController != null) {
       _videoController!.dispose();
     }
 
+    // Liberar el controlador de mensaje y desconectar el socket
     messageController.dispose();
+    socket.off('receiveMessage');
+    socket.disconnect();
 
-    super.dispose();
+    super.dispose(); // Llamar a super.dispose() al final
   }
 
 //////////////////////// audio
@@ -160,14 +172,13 @@ bool _isSendingVideo = false; // Agrega esta línea
     await _sendAudioMessage(_filePath);
   }
 
-
-
- Future<void> _stopPlaying(int messageId) async {
-  await _player.stopPlayer();
-  setState(() {
-    _isPlayingMap[messageId] = false; // Cambiar solo el estado del mensaje actual
-  });
-}
+  Future<void> _stopPlaying(int messageId) async {
+    await _player.stopPlayer();
+    setState(() {
+      _isPlayingMap[messageId] =
+          false; // Cambiar solo el estado del mensaje actual
+    });
+  }
 
   /////////////////////////////  obtener nombre
   Future<void> getNameRemitenteGroupChat(String numElemento) async {
@@ -306,6 +317,7 @@ bool _isSendingVideo = false; // Agrega esta línea
   }
 
   void _handleReceivedMessage(dynamic data) {
+    print("mensaje recibido en handle");
     // Verificar si el mensaje pertenece al grupo actual
     if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
       var receivedMessage = {
@@ -319,11 +331,14 @@ bool _isSendingVideo = false; // Agrega esta línea
       };
 
       // Verificar si el mensaje ya existe en la lista de mensajes
-      bool messageExists = messages
-          .any((msg) => msg['MENSAJE_ID'] == receivedMessage['MENSAJE_ID']);
+      bool messageExists = messages.any((msg) =>
+          msg['MENSAJE_ID'].toString() ==
+          receivedMessage['MENSAJE_ID'].toString());
 
       if (!messageExists) {
+        print("Mensaje no existe en la lista de mensajes");
         if (mounted) {
+          print("componente montado");
           setState(() {
             // Ajustar la URL completa del servidor
             if (receivedMessage['MEDIA'] == 'IMAGE') {
@@ -339,6 +354,8 @@ bool _isSendingVideo = false; // Agrega esta línea
           WidgetsBinding.instance
               .addPostFrameCallback((_) => _scrollToBottom());
         }
+      }else{
+        print("Mensaje ya existe en la lista de mensajes");
       }
     } else {
       print(
@@ -405,6 +422,9 @@ bool _isSendingVideo = false; // Agrega esta línea
   }
 
   Future<void> _sendMediaMessage(String filePath, String fileType) async {
+    setState(() {
+      _isUploading = true; // Iniciar carga
+    });
     var currentDate = DateTime.now();
     var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
@@ -449,7 +469,7 @@ bool _isSendingVideo = false; // Agrega esta línea
           'MENSAJE':
               '', // Asegúrate de convertir imageUrl a String si es necesario
           'MEDIA': 'IMAGE',
-          
+
           'UBICACION':
               imageUrl.toString(), // Asegúrate de incluir la URL completa aquí
           'ELEMENTO_NUMERO': widget.numElemento,
@@ -464,14 +484,22 @@ bool _isSendingVideo = false; // Agrega esta línea
         if (mounted) {
           setState(() {
             messages.add(newMessage);
+            _isUploading = false; // Finalizar carga
           });
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => _scrollToBottom());
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        // Desplazarse solo si aún está montado
+        _scrollToBottom();
+      }
+    });
         }
       } else {
         throw Exception('Failed to send media message');
       }
     } catch (e) {
+      setState(() {
+        _isUploading = false; // Finalizar carga en caso de error
+      });
       print('Error sending media message: $e');
     }
   }
@@ -491,82 +519,84 @@ bool _isSendingVideo = false; // Agrega esta línea
     }
   }
 
-Future<void> _sendMediaMessageVIDEO(String filePath, String fileType) async {
-  setState(() {
-    _isUploading = true; // Iniciar carga
-  });
-
-  var currentDate = DateTime.now();
-  var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
-
-  var requestBody = {
-    "FECHA": formattedDate,
-    "RECEPTOR": widget.idGrupo,
-    "MENSAJE": '',
-    "MEDIA": filePath,
-    "TIPO_MEDIA": fileType,
-    "UBICACION": "NA"
-  };
-
-  var url =
-      '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/video/group/video/${widget.numElemento}/${widget.idGrupo}';
-  print(url);
-
-  try {
-    var requestBodyJson = jsonEncode(requestBody);
-
-    var request = http.MultipartRequest('POST', Uri.parse(url));
-    var file = await http.MultipartFile.fromPath('video', filePath);
-    var fileSizeInBytes = file.length; // Tamaño del archivo en bytes
-    var fileSizeInMB = fileSizeInBytes / (1024 * 1024); // Convertir a MB
-
-    print(
-        "Archivo para enviar: ${file.filename}, tamaño: ${fileSizeInMB.toStringAsFixed(2)} MB");
-
-    request.files.add(file);
-    request.fields['data'] = requestBodyJson;
-
-    var streamedResponse = await request.send();
-    var response = await http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode == 200) {
-      var responseData = json.decode(response.body);
-      var videoUrl = responseData['videoUrl']; // Asegúrate de verificar el campo de respuesta
-
-      var newMessage = {
-        'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
-        'FECHA': formattedDate,
-        'REMITENTE': widget.numElemento,
-        'MENSAJE': '',
-        'MEDIA': 'VIDEO', // Cambiado de 'IMAGE' a 'VIDEO'
-        'UBICACION': videoUrl.toString(),
-        'ELEMENTO_NUMERO': widget.numElemento,
-        'NOMBRE_REMITENTE': NombreRemitente,
-        'groupId': widget.idGrupo,
-        'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO'],
-        'GRUPO_ID': widget.idGrupo,
-      };
-
-      socket.emit('sendMessage', newMessage);
-      print(newMessage);
-      if (mounted) {
-        setState(() {
-          messages.add(newMessage);
-          _isUploading = false; // Finalizar carga
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-    } else {
-      print('Error: ${response.statusCode}, ${response.body}');
-      throw Exception('Failed to send media message');
-    }
-  } catch (error) {
-    print('Error sending media message: $error');
+  Future<void> _sendMediaMessageVIDEO(String filePath, String fileType) async {
     setState(() {
-      _isUploading = false; // Finalizar carga en caso de error
+      _isUploading = true; // Iniciar carga
     });
+
+    var currentDate = DateTime.now();
+    var formattedDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+
+    var requestBody = {
+      "FECHA": formattedDate,
+      "RECEPTOR": widget.idGrupo,
+      "MENSAJE": '',
+      "MEDIA": filePath,
+      "TIPO_MEDIA": fileType,
+      "UBICACION": "NA"
+    };
+
+    var url =
+        '${ConfigBackend.backendUrlComunication}/segucomunication/api/messages/video/group/video/${widget.numElemento}/${widget.idGrupo}';
+    print(url);
+
+    try {
+      var requestBodyJson = jsonEncode(requestBody);
+
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      var file = await http.MultipartFile.fromPath('video', filePath);
+      var fileSizeInBytes = file.length; // Tamaño del archivo en bytes
+      var fileSizeInMB = fileSizeInBytes / (1024 * 1024); // Convertir a MB
+
+      print(
+          "Archivo para enviar: ${file.filename}, tamaño: ${fileSizeInMB.toStringAsFixed(2)} MB");
+
+      request.files.add(file);
+      request.fields['data'] = requestBodyJson;
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        var responseData = json.decode(response.body);
+        var videoUrl = responseData[
+            'videoUrl']; // Asegúrate de verificar el campo de respuesta
+
+        var newMessage = {
+          'MENSAJE_ID': currentDate.millisecondsSinceEpoch,
+          'FECHA': formattedDate,
+          'REMITENTE': widget.numElemento,
+          'MENSAJE': '',
+          'MEDIA': 'VIDEO', // Cambiado de 'IMAGE' a 'VIDEO'
+          'UBICACION': videoUrl.toString(),
+          'ELEMENTO_NUMERO': widget.numElemento,
+          'NOMBRE_REMITENTE': NombreRemitente,
+          'groupId': widget.idGrupo,
+          'GRUPO_DESCRIP': widget.chatData['NOMBRE_COMPLETO'],
+          'GRUPO_ID': widget.idGrupo,
+        };
+
+        socket.emit('sendMessage', newMessage);
+        print(newMessage);
+        if (mounted) {
+          setState(() {
+            messages.add(newMessage);
+            _isUploading = false; // Finalizar carga
+          });
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _scrollToBottom());
+        }
+      } else {
+        print('Error: ${response.statusCode}, ${response.body}');
+        throw Exception('Failed to send media message');
+      }
+    } catch (error) {
+      print('Error sending media message: $error');
+      setState(() {
+        _isUploading = false; // Finalizar carga en caso de error
+      });
+    }
   }
-}
 
   void _scrollToBottom() {
     _scrollController.animateTo(
@@ -576,37 +606,39 @@ Future<void> _sendMediaMessageVIDEO(String filePath, String fileType) async {
     );
   }
 
-Future<Uint8List?> _generateThumbnail(String videoUrl, int messageId) async {
-  String thumbnailPath = '${(await getTemporaryDirectory()).path}/${videoUrl.hashCode}.png';
+  Future<Uint8List?> _generateThumbnail(String videoUrl, int messageId) async {
+    String thumbnailPath =
+        '${(await getTemporaryDirectory()).path}/${videoUrl.hashCode}.png';
 
-  // Verifica si la miniatura ya existe
-  if (await File(thumbnailPath).exists()) {
-    print('Miniatura existente encontrada en: $thumbnailPath');
-    return await File(thumbnailPath).readAsBytes(); // Devuelve la miniatura almacenada
-  }
-
-  print('Intentando generar miniatura para: $videoUrl');
-  try {
-    final uint8List = await VideoThumbnail.thumbnailData(
-      video: videoUrl,
-      imageFormat: ImageFormat.PNG,
-      maxWidth: 200,
-      quality: 75,
-    );
-
-    if (uint8List != null) {
-      // Guarda la miniatura en el almacenamiento temporal
-      await File(thumbnailPath).writeAsBytes(uint8List);
-      print('Miniatura generada y guardada en: $thumbnailPath');
-    } else {
-      print('Miniatura generada es nula. Verifique el video.');
+    // Verifica si la miniatura ya existe
+    if (await File(thumbnailPath).exists()) {
+      print('Miniatura existente encontrada en: $thumbnailPath');
+      return await File(thumbnailPath)
+          .readAsBytes(); // Devuelve la miniatura almacenada
     }
-    return uint8List;
-  } catch (e) {
-    print('Error generando miniatura: $e');
-    return null;
+
+    print('Intentando generar miniatura para: $videoUrl');
+    try {
+      final uint8List = await VideoThumbnail.thumbnailData(
+        video: videoUrl,
+        imageFormat: ImageFormat.PNG,
+        maxWidth: 200,
+        quality: 75,
+      );
+
+      if (uint8List != null) {
+        // Guarda la miniatura en el almacenamiento temporal
+        await File(thumbnailPath).writeAsBytes(uint8List);
+        print('Miniatura generada y guardada en: $thumbnailPath');
+      } else {
+        print('Miniatura generada es nula. Verifique el video.');
+      }
+      return uint8List;
+    } catch (e) {
+      print('Error generando miniatura: $e');
+      return null;
+    }
   }
-}
 
   Widget _buildMessage(Map<String, dynamic> message) {
     if (message == null) {
@@ -619,11 +651,11 @@ Future<Uint8List?> _generateThumbnail(String videoUrl, int messageId) async {
     bool isVideo = message.containsKey('MEDIA') && message['MEDIA'] == 'VIDEO';
     //comprobar si messge contiene MENSAJE_ID
     bool isID = message.containsKey('MENSAJE_ID');
-      int messageId = message['MENSAJE_ID'];
-      // Inicializa el estado de reproducción si no existe en el mapa
-  _isPlayingMap.putIfAbsent(messageId, () => false);
-   // print("Contiene ID?: " + isID.toString());
-   //  print("######################################################################################################## " + message['MENSAJE_ID'].toString());
+    int messageId = message['MENSAJE_ID'];
+    // Inicializa el estado de reproducción si no existe en el mapa
+    _isPlayingMap.putIfAbsent(messageId, () => false);
+    // print("Contiene ID?: " + isID.toString());
+    //  print("######################################################################################################## " + message['MENSAJE_ID'].toString());
     String messageText =
         message['MENSAJE'] ?? ''; // Manejo seguro de mensaje nulo
     String remitente = message['NOMBRE'] ?? '';
@@ -652,136 +684,151 @@ Future<Uint8List?> _generateThumbnail(String videoUrl, int messageId) async {
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-     if (isMedia)
-  GestureDetector(
-    onTap: () {
-      // Mostrar la imagen en una vista emergente
-      showDialog(
-        context: context,
-        builder: (context) {
-          return Dialog(
-            child: InteractiveViewer(
-              child: CachedNetworkImage(
-                imageUrl: '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-                fit: BoxFit.contain,
-                width: double.infinity,
-                height: 400,
-                placeholder: (context, url) => Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) => Icon(Icons.error),
+            if (isMedia)
+              GestureDetector(
+                onTap: () {
+                  // Mostrar la imagen en una vista emergente
+                  showDialog(
+                    context: context,
+                    builder: (context) {
+                      return Dialog(
+                        child: InteractiveViewer(
+                          child: CachedNetworkImage(
+                            imageUrl:
+                                '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            height: 400,
+                            placeholder: (context, url) =>
+                                Center(child: CircularProgressIndicator()),
+                            errorWidget: (context, url, error) =>
+                                Icon(Icons.error),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+                child: CachedNetworkImage(
+                  imageUrl:
+                      '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Center(child: CircularProgressIndicator()),
+                  errorWidget: (context, url, error) => Icon(Icons.error),
+                ),
               ),
-            ),
-          );
-        },
-      );
-    },
-    child: CachedNetworkImage(
-      imageUrl: '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
-      width: 200,
-      height: 200,
-      fit: BoxFit.cover,
-      placeholder: (context, url) => Center(child: CircularProgressIndicator()),
-      errorWidget: (context, url, error) => Icon(Icons.error),
-    ),
-  ),
 
             if (isAudio)
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isPlayingMap[messageId]! ? 'Reproduciendo' : 'Mensaje de voz',
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isPlayingMap[messageId]!
+                          ? 'Reproduciendo'
+                          : 'Mensaje de voz',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isPlayingMap[messageId]! ? Icons.stop : Icons.play_arrow,
-                    color: isMe ? Colors.white : Colors.black,
+                  IconButton(
+                    icon: Icon(
+                      _isPlayingMap[messageId]! ? Icons.stop : Icons.play_arrow,
+                      color: isMe ? Colors.white : Colors.black,
+                    ),
+                    onPressed: () async {
+                      if (_isPlayingMap[messageId]!) {
+                        await _stopPlaying(messageId);
+                      } else {
+                        // Reproducir el audio
+                        print(
+                            'REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
+                        await _player.startPlayer(
+                          fromURI:
+                              '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
+                          whenFinished: () {
+                            setState(() {
+                              _isPlayingMap[messageId] =
+                                  false; // Cambiar el estado del mensaje actual
+                            });
+                          },
+                        );
+                        setState(() {
+                          _isPlayingMap[messageId] =
+                              true; // Cambiar el estado del mensaje actual
+                        });
+                      }
+                    },
                   ),
-                  onPressed: () async {
-                    if (_isPlayingMap[messageId]!) {
-                      await _stopPlaying(messageId);
-                    } else {
-                      // Reproducir el audio
-                      print('REPRODUCIENDO DE: ${ConfigBackend.backendUrlComunication}${message['UBICACION']}');
-                      await _player.startPlayer(
-                        fromURI: '${ConfigBackend.backendUrlComunication}${message['UBICACION']}',
-                        whenFinished: () {
-                          setState(() {
-                            _isPlayingMap[messageId] = false; // Cambiar el estado del mensaje actual
-                          });
-                        },
-                      );
-                      setState(() {
-                        _isPlayingMap[messageId] = true; // Cambiar el estado del mensaje actual
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-   
-if (isVideo)
-  FutureBuilder<Uint8List?>(
-    future: _generateThumbnail('${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}', message['MENSAJE_ID']),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        // Muestra el texto de carga solo si no se está reproduciendo otro video
-        return Center(
-          child: Text(
-            _isVideoDownloading[message['MENSAJE_ID']] == true
-                ? '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video'
-                : _isThumbnailGenerating[message['MENSAJE_ID']] == true
-                    ? 'Cargando miniatura...'
-                    : 'Miniatura oculta',
-            style: TextStyle(color: Colors.white),
-          ),
-        );
-      } else if (snapshot.hasError) {
-        return Text('Error al cargar la miniatura');
-      } else {
-        // Si la miniatura fue generada correctamente, muestra el widget de miniatura
-        return GestureDetector(
-          onTap: () async {
-            // Comienza la descarga del video
-            await _downloadVideo('${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}', message['MENSAJE_ID']);
-            // Una vez descargado, reprodúzcalo
-            if (_localVideoPath != null) {
-              _playVideo(_localVideoPath!);
-            }
-          },
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.memory(
-                snapshot.data!,
-                width: 200, // Ajusta el ancho de la miniatura
-                height: 200, // Ajusta la altura de la miniatura
-                fit: BoxFit.cover,
+                ],
               ),
-              Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 64.0, // Tamaño del ícono de reproducción
+
+            if (isVideo)
+              FutureBuilder<Uint8List?>(
+                future: _generateThumbnail(
+                    '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                    message['MENSAJE_ID']),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    // Muestra el texto de carga solo si no se está reproduciendo otro video
+                    return Center(
+                      child: Text(
+                        _isVideoDownloading[message['MENSAJE_ID']] == true
+                            ? '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video'
+                            : _isThumbnailGenerating[message['MENSAJE_ID']] ==
+                                    true
+                                ? 'Cargando miniatura...'
+                                : 'Miniatura oculta',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text('Error al cargar la miniatura');
+                  } else {
+                    // Si la miniatura fue generada correctamente, muestra el widget de miniatura
+                    return GestureDetector(
+                      onTap: () async {
+                        // Comienza la descarga del video
+                        await _downloadVideo(
+                            '${ConfigBackend.backendUrlComunication}${message['UBICACION'] ?? ''}',
+                            message['MENSAJE_ID']);
+                        // Una vez descargado, reprodúzcalo
+                        if (_localVideoPath != null) {
+                          _playVideo(_localVideoPath!);
+                        }
+                      },
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Image.memory(
+                            snapshot.data!,
+                            width: 200, // Ajusta el ancho de la miniatura
+                            height: 200, // Ajusta la altura de la miniatura
+                            fit: BoxFit.cover,
+                          ),
+                          Icon(
+                            Icons.play_arrow,
+                            color: Colors.white,
+                            size: 64.0, // Tamaño del ícono de reproducción
+                          ),
+                          if (_isVideoDownloading[message['MENSAJE_ID']] ==
+                              true)
+                            Positioned(
+                              bottom: 10,
+                              child: Text(
+                                '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }
+                },
               ),
-              if (_isVideoDownloading[message['MENSAJE_ID']] == true)
-                Positioned(
-                  bottom: 10,
-                  child: Text(
-                    '${(_downloadProgress * 100).toStringAsFixed(0)}% cargando video',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-            ],
-          ),
-        );
-      }
-    },
-  ),
-
-
 
             if (!isMedia && !isAudio && !isVideo)
               Text(
@@ -814,70 +861,71 @@ if (isVideo)
     );
   }
 
-
-
-Future<void> _downloadVideo(String url, int messageId) async {
-  setState(() {
-    _isVideoDownloading[messageId] = true; // Marca el video como en descarga
-    _downloadProgress = 0.0;
-  });
-
-  try {
-    var dir = await getTemporaryDirectory();
-    String filePath = '${dir.path}/video_$messageId.mp4';
-
-    await Dio().download(
-      url,
-      filePath,
-      onReceiveProgress: (received, total) {
-        if (total != -1) {
-          setState(() {
-            _downloadProgress = received / total;
-          });
-        }
-      },
-    );
-
+  Future<void> _downloadVideo(String url, int messageId) async {
     setState(() {
-      _localVideoPath = filePath;
-      _isVideoDownloading[messageId] = false; // Marca la descarga como completa
+      _isVideoDownloading[messageId] = true; // Marca el video como en descarga
+      _downloadProgress = 0.0;
     });
-    print('Video descargado a: $filePath');
-  } catch (e) {
-    print('Error al descargar el video: $e');
-    setState(() {
-      _isVideoDownloading[messageId] = false; // En caso de error, también marcar como completo
-    });
+
+    try {
+      var dir = await getTemporaryDirectory();
+      String filePath = '${dir.path}/video_$messageId.mp4';
+
+      await Dio().download(
+        url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+
+      setState(() {
+        _localVideoPath = filePath;
+        _isVideoDownloading[messageId] =
+            false; // Marca la descarga como completa
+      });
+      print('Video descargado a: $filePath');
+    } catch (e) {
+      print('Error al descargar el video: $e');
+      setState(() {
+        _isVideoDownloading[messageId] =
+            false; // En caso de error, también marcar como completo
+      });
+    }
   }
-}
 
-void _playVideo(String videoPath) {
-  _videoController = VideoPlayerController.file(File(videoPath))
-    ..setLooping(false) // Omitir si no es necesario
-    ..initialize().then((_) {
-      // Comienza la reproducción inmediatamente después de inicializar
-      _videoController.play();
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => FullScreenVideoPlayer(controller: _videoController),
-      ));
-    });
-}
+  void _playVideo(String videoPath) {
+    _videoController = VideoPlayerController.file(File(videoPath))
+      ..setLooping(false) // Omitir si no es necesario
+      ..initialize().then((_) {
+        // Comienza la reproducción inmediatamente después de inicializar
+        _videoController.play();
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) =>
+              FullScreenVideoPlayer(controller: _videoController),
+        ));
+      });
+  }
 
+  Widget _buildDateSeparator(String date) {
+    DateTime dateTime = DateTime.parse(date);
+    String formattedDate = DateFormat('dd/MM/yyyy')
+        .format(dateTime); // Cambia el formato si lo deseas
 
-Widget _buildDateSeparator(String date) {
-  DateTime dateTime = DateTime.parse(date);
-  String formattedDate = DateFormat('dd/MM/yyyy').format(dateTime); // Cambia el formato si lo deseas
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Center(
-      child: Text(
-        formattedDate,
-        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          formattedDate,
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -901,6 +949,16 @@ Widget _buildDateSeparator(String date) {
             ),
           ],
         ),
+        leading: IconButton(
+  icon: Icon(Icons.arrow_back),
+  onPressed: () {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => ChatListScreen()),
+    );
+  },
+),
+
       ),
       body: Column(
         children: [
@@ -910,37 +968,37 @@ Widget _buildDateSeparator(String date) {
                 : ListView.builder(
                     controller: _scrollController,
                     itemCount: messages.length,
-           itemBuilder: (context, index) {
-  var message = messages[index];
-  bool showDateSeparator = false;
+                    itemBuilder: (context, index) {
+                      var message = messages[index];
+                      bool showDateSeparator = false;
 
-  if (index == 0) {
-    // Muestra el separador para el primer mensaje
-    showDateSeparator = true;
-  } else {
-    String prevMessageDate =
-        messages[index - 1]['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    String currentMessageDate =
-        message['FECHA'].split(' ')[0]; // Extrae solo la fecha
-    showDateSeparator = prevMessageDate != currentMessageDate; // Compara las fechas
-  }
+                      if (index == 0) {
+                        // Muestra el separador para el primer mensaje
+                        showDateSeparator = true;
+                      } else {
+                        String prevMessageDate = messages[index - 1]['FECHA']
+                            .split(' ')[0]; // Extrae solo la fecha
+                        String currentMessageDate = message['FECHA']
+                            .split(' ')[0]; // Extrae solo la fecha
+                        showDateSeparator = prevMessageDate !=
+                            currentMessageDate; // Compara las fechas
+                      }
 
-  return Column(
-    children: [
-      if (showDateSeparator)
-        _buildDateSeparator(message['FECHA']), // Mostrar separador solo si es necesario
-      _buildMessage(message), // Construir el mensaje
-    ],
-  );
-}
-
-                  ),
+                      return Column(
+                        children: [
+                          if (showDateSeparator)
+                            _buildDateSeparator(message[
+                                'FECHA']), // Mostrar separador solo si es necesario
+                          _buildMessage(message), // Construir el mensaje
+                        ],
+                      );
+                    }),
           ),
           if (_isUploading) // Muestra el loader si está subiendo
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Center(child: CircularProgressIndicator()),
-          ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(

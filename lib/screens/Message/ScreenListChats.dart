@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/Message/ChatGruoup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../configBackend.dart';
@@ -70,19 +71,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
     print("callerNumber: $callerNumber");
 
     if (requestCalling == 'true') {
+      requestCallName = callerName!;
       print("Hay llamadas en curso pendientes");
       setState(() {
         requestCall =
             'true'; // Actualiza el estado a 'true' si hay una llamada en curso
-        requestCallName = callerName ?? ''; // Nombre del llamador
+        requestCallName = callerName ?? 'no se pudo obtener'; // Nombre del llamador
         requestCallNumber = callerNumber ?? ''; // Número del llamador
       });
-      if (requestCalling == 'false') {
-        setState(() {
-          requestCall = 'false'; // Actualiza el estado a 'false' si no hay llamadas en curso
-        });
 
-      }
       print('Nombre del llamador: $requestCallName');
       print('Número del llamador: $requestCallNumber');
     } else {
@@ -164,197 +161,250 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text('Chats'),
-    ),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            width: 350, // Ajusta el ancho según sea necesario
-            child: TextField(
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Color(0xFFDCDCDC).withOpacity(0.12), // Fondo con 12% de opacidad
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                  borderSide: BorderSide(color: Colors.black.withOpacity(0.12)), // Contorno con 12% de opacidad
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Chats'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => MenuScreen()),
+            );
+          },
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Container(
+              width: 350, // Ajusta el ancho según sea necesario
+              child: TextField(
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Color(0xFFDCDCDC)
+                      .withOpacity(0.12), // Fondo con 12% de opacidad
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                    borderSide: BorderSide(
+                        color: Colors.black
+                            .withOpacity(0.12)), // Contorno con 12% de opacidad
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                    borderSide: BorderSide(
+                        color: Colors.black
+                            .withOpacity(0.12)), // Contorno al enfocar
+                  ),
+                  labelText: 'Buscar',
+                  contentPadding: EdgeInsets.symmetric(
+                      vertical: 8.0, horizontal: 12.0), // Ajustar el padding
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                  borderSide: BorderSide(color: Colors.black.withOpacity(0.12)), // Contorno al enfocar
-                ),
-                labelText: 'Buscar',
-                contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0), // Ajustar el padding
+                onChanged: _filterChats,
               ),
-              onChanged: _filterChats,
             ),
           ),
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshChats,
-            child: FutureBuilder<List<dynamic>>(
-              future: Future.wait([futureChats, futureChatsGroups]),
-              builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else if (!snapshot.hasData || (snapshot.data![0].isEmpty && snapshot.data![1].isEmpty)) {
-                  return Center(child: Text('No hay chats disponibles'));
-                } else {
-                  List<dynamic> chats = snapshot.data![0];
-                  List<dynamic> chatsGroups = snapshot.data![1];
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshChats,
+              child: FutureBuilder<List<dynamic>>(
+                future: Future.wait([futureChats, futureChatsGroups]),
+                builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData ||
+                      (snapshot.data![0].isEmpty &&
+                          snapshot.data![1].isEmpty)) {
+                    return Center(child: Text('No hay chats disponibles'));
+                  } else {
+                    List<dynamic> chats = snapshot.data![0];
+                    List<dynamic> chatsGroups = snapshot.data![1];
 
-                  // Filtrar chats
-                  var filteredChats = chats
-                      .where((chat) => chat['NOMBRE_COMPLETO'].toLowerCase().contains(_searchQuery.toLowerCase()))
-                      .toList();
+                    // Filtrar chats
+                    var filteredChats = chats
+                        .where((chat) => chat['NOMBRE_COMPLETO']
+                            .toLowerCase()
+                            .contains(_searchQuery.toLowerCase()))
+                        .toList();
 
-                  // Filtrar grupos
-                  var filteredChatsGroups = chatsGroups
-                      .where((chatGroup) => chatGroup['NOMBRE_COMPLETO'].toLowerCase().contains(_searchQuery.toLowerCase()))
-                      .toList();
+                    // Filtrar grupos
+                    var filteredChatsGroups = chatsGroups
+                        .where((chatGroup) => chatGroup['NOMBRE_COMPLETO']
+                            .toLowerCase()
+                            .contains(_searchQuery.toLowerCase()))
+                        .toList();
 
-                  // Verificar si hay una solicitud de llamada y mover ese chat al principio
-                  if (requestCall == 'true') {
-                    filteredChats.sort((a, b) {
-                      if (a['NOMBRE_COMPLETO'] == requestCallName) return -1; // Mover al principio
-                      if (b['NOMBRE_COMPLETO'] == requestCallName) return 1; // Mover al final
-                      return 0; // Mantener orden original
-                    });
-                  }
+                    // Verificar si hay una solicitud de llamada y mover ese chat al principio
+                    
+                    if (requestCall == 'true') {
+                      filteredChats.sort((a, b) {
+                        if (a['NOMBRE_COMPLETO'] == requestCallName.toString())
+                          return -1; // Mover al principio
+                        if (b['NOMBRE_COMPLETO'] == requestCallName)
+                          return 1; // Mover al final
+                        return 0; // Mantener orden original
+                      });
+                    }
 
-                  return ListView.builder(
-                    itemCount: filteredChats.length + filteredChatsGroups.length,
-                    itemBuilder: (context, index) {
-                      if (index < filteredChats.length) {
-                        var chat = filteredChats[index];
-                        bool isRequestCall = requestCall == 'true' && chat['NOMBRE_COMPLETO'] == requestCallName;
+                    return ListView.builder(
+                      itemCount:
+                          filteredChats.length + filteredChatsGroups.length,
+                      itemBuilder: (context, index) {
+                        if (index < filteredChats.length) {
+                          var chat = filteredChats[index];
+                       bool isRequestCall = requestCall == 'true' &&
+    chat['NOMBRE_COMPLETO'].trim().toLowerCase() == requestCallName.trim().toLowerCase();
 
-                        return Column(
-                          children: [
-                            Container(
-                              color: isRequestCall ? Colors.blue : Colors.transparent, // Color de fondo azul si hay solicitud de llamada
-                              child: ListTile(
+print("Es una solicitud de llamada: $isRequestCall");
+
+                          print("inicio de comparacion de llamad------");
+                          print("Nombre del chat de llamada:" +
+                              chat['NOMBRE_COMPLETO']);
+                          print("Nombre de quién hizo la llamada:" +
+                              requestCallName);
+                          print("fin de comparacion de llamad------");
+
+                          return Column(
+                            children: [
+                              Container(
+                                color: isRequestCall
+                                    ? Colors.blue
+                                    : Colors
+                                        .transparent, // Color de fondo azul si hay solicitud de llamada
+                                child: ListTile(
+                                  leading: Image.asset(
+                                    'lib/assets/icons/contact.png',
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                  title: Text(
+                                    isRequestCall
+                                        ? '${chat['NOMBRE_COMPLETO']}'
+                                        : '${chat['NOMBRE_COMPLETO']}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isRequestCall
+                                          ? Colors.white
+                                          : Colors
+                                              .black, // Cambiar color de texto si hay solicitud de llamada
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    isRequestCall
+                                        ? 'LLAMADA SOLICITADA'
+                                        : '${chat['ULTIMO_MENSAJE']}',
+                                    style: TextStyle(
+                                        color: isRequestCall
+                                            ? Colors.white70
+                                            : Colors.black54),
+                                  ),
+                                  onTap: () async {
+                                    // Navegar a ChatScreen y esperar resultado
+                                    var result =
+                                        await Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatScreen(
+                                          chatData: chat,
+                                          numElemento: _numElemento,
+                                        ),
+                                      ),
+                                    );
+
+                                    // Actualizar la lista de chats si se envió un mensaje
+                                    if (result != null &&
+                                        result is bool &&
+                                        result) {
+                                      setState(() {
+                                        futureChats = fetchChats();
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              Divider(
+                                color: Colors.grey,
+                                thickness: 1.0,
+                                indent: 16.0,
+                                endIndent: 16.0,
+                              ),
+                            ],
+                          );
+                        } else {
+                          var chatGroup =
+                              filteredChatsGroups[index - filteredChats.length];
+                          return Column(
+                            children: [
+                              ListTile(
                                 leading: Image.asset(
-                                  'lib/assets/icons/contact.png',
+                                  'lib/assets/icons/chatGroup.png',
                                   width: 48,
                                   height: 48,
                                 ),
                                 title: Text(
-                                  isRequestCall ? '${chat['NOMBRE_COMPLETO']}' : '${chat['NOMBRE_COMPLETO']}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isRequestCall ? Colors.white : Colors.black, // Cambiar color de texto si hay solicitud de llamada
-                                  ),
+                                  '${chatGroup['NOMBRE_COMPLETO']}',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                subtitle: Text(
-                                  isRequestCall ? 'LLAMADA SOLICITADA' :  '${chat['ULTIMO_MENSAJE']}',
-                                 
-                                  style: TextStyle(color: isRequestCall ? Colors.white70 : Colors.black54),
-                                ),
-                           onTap: () async {
-  // Navegar a ChatScreen y esperar resultado
-  var result = await Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ChatScreen(
-        chatData: chat,
-        numElemento: _numElemento,
-      ),
-    ),
-  );
-
-  // Actualizar la lista de chats si se envió un mensaje
-  if (result != null && result is bool && result) {
-    setState(() {
-      futureChats = fetchChats();
-    });
-  }
-},
-
-                              ),
-                            ),
-                            Divider(
-                              color: Colors.grey,
-                              thickness: 1.0,
-                              indent: 16.0,
-                              endIndent: 16.0,
-                            ),
-                          ],
-                        );
-                      } else {
-                        var chatGroup = filteredChatsGroups[index - filteredChats.length];
-                        return Column(
-                          children: [
-                            ListTile(
-                              leading: Image.asset(
-                                'lib/assets/icons/chatGroup.png',
-                                width: 48,
-                                height: 48,
-                              ),
-                              title: Text(
-                                '${chatGroup['NOMBRE_COMPLETO']}',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text('${chatGroup['ULTIMO_MENSAJE']}'),
-                              onTap: () async {
-                                // Navegar a ChatScreenGroup y esperar resultado
-                                var result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ChatScreenGroup(
-                                      chatData: chatGroup,
-                                      numElemento: _numElemento,
-                                      idGrupo: chatGroup['GRUPO_ID'].toString(),
+                                subtitle:
+                                    Text('${chatGroup['ULTIMO_MENSAJE']}'),
+                                onTap: () async {
+                                  // Navegar a ChatScreenGroup y esperar resultado
+                                  var result = await Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ChatScreenGroup(
+                                        chatData: chatGroup,
+                                        numElemento: _numElemento,
+                                        idGrupo:
+                                            chatGroup['GRUPO_ID'].toString(),
+                                      ),
                                     ),
-                                  ),
-                                );
+                                  );
 
-                                // Actualizar la lista de chats si se envió un mensaje
-                                if (result != null && result is bool && result) {
-                                  setState(() {
-                                    futureChatsGroups = fetchChatsGroups();
-                                  });
-                                }
-                              },
-                            ),
-                            Divider(
-                              color: Colors.grey,
-                              thickness: 1.0,
-                              indent: 16.0,
-                              endIndent: 16.0,
-                            ),
-                          ],
-                        );
-                      }
-                    },
-                  );
-                }
-              },
+                                  // Actualizar la lista de chats si se envió un mensaje
+                                  if (result != null &&
+                                      result is bool &&
+                                      result) {
+                                    setState(() {
+                                      futureChatsGroups = fetchChatsGroups();
+                                    });
+                                  }
+                                },
+                              ),
+                              Divider(
+                                color: Colors.grey,
+                                thickness: 1.0,
+                                indent: 16.0,
+                                endIndent: 16.0,
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    );
+                  }
+                },
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => NewMessageScreen(),
-          ),
-        );
-      },
-      child: Icon(Icons.add),
-    ),
-  );
-}
-
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => NewMessageScreen(),
+            ),
+          );
+        },
+        child: Icon(Icons.add),
+      ),
+    );
+  }
 }
