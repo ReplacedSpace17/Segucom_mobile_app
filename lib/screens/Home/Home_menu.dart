@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:segucom_app/Services_background/CacheService.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -92,7 +94,6 @@ class _MenuScreenState extends State<MenuScreen> {
       print("NOMBRE BD:" + nombreCompleto);
       // Almacena el nombre completo en SharedPreferences
       await prefs.setString('NombreBD', nombreCompleto);
-      
     } else {
       // Manejo de errores, puedes lanzar una excepción o imprimir un mensaje
       throw Exception(
@@ -235,7 +236,7 @@ class _MenuScreenState extends State<MenuScreen> {
     return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}";
   }
 
-  void _onItemTapped(int index) {
+  Future<void> _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -246,17 +247,20 @@ class _MenuScreenState extends State<MenuScreen> {
 
         break;
       case 1:
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => PerfilScreen()),
         );
+
         break;
       case 2:
+     
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => ChatListScreen()),
         );
         break;
+
       case 3:
         // Navegar a la pantalla de ajustes si es necesario
         Navigator.push(

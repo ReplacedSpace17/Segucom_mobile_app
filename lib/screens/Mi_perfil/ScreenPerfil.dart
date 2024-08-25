@@ -304,7 +304,9 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                             10), // Espacio adicional entre las cards y el botón
                     Center(
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final SharedPreferences prefs = await SharedPreferences.getInstance();
+prefs.setString('authToken', 'NULL');
                           Navigator.push(
                             context,
                             MaterialPageRoute(

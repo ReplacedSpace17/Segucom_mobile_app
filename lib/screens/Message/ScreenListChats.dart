@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:segucom_app/Services_background/CacheService.dart';
 import 'package:segucom_app/screens/Home/Home_menu.dart';
 import 'package:segucom_app/screens/Message/ChatGruoup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,16 +44,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
   String requestCall = '';
   String requestCallName = '';
   String requestCallNumber = '';
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     getCallerInfo();
+    _getrefresh();
     _loadNumElemento().then((_) {
       setState(() {
         futureChats = fetchChats();
         futureChatsGroups = fetchChatsGroups();
       });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+
+    super.dispose();
+  }
+
+  void _getrefresh() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      //validar si hay una solicitud de llamada
     });
   }
 
@@ -61,8 +78,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Future<void> getCallerInfo() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    String? requestCalling = prefs.getString('requestCalling');
-    String? callerName = prefs.getString('callerName');
+    String? requestCalling = await CacheService().getData('requestCalling');
+    String? callerName = await CacheService().getData('callerName');
     String? callerNumber = prefs.getString('callerNumber');
 
     print("Datos obtenidos:");
@@ -76,7 +93,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       setState(() {
         requestCall =
             'true'; // Actualiza el estado a 'true' si hay una llamada en curso
-        requestCallName = callerName ?? 'no se pudo obtener'; // Nombre del llamador
+        requestCallName =
+            callerName ?? 'no se pudo obtener'; // Nombre del llamador
         requestCallNumber = callerNumber ?? ''; // Número del llamador
       });
 
@@ -240,7 +258,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         .toList();
 
                     // Verificar si hay una solicitud de llamada y mover ese chat al principio
-                    
+
                     if (requestCall == 'true') {
                       filteredChats.sort((a, b) {
                         if (a['NOMBRE_COMPLETO'] == requestCallName.toString())
@@ -257,10 +275,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       itemBuilder: (context, index) {
                         if (index < filteredChats.length) {
                           var chat = filteredChats[index];
-                       bool isRequestCall = requestCall == 'true' &&
-    chat['NOMBRE_COMPLETO'].trim().toLowerCase() == requestCallName.trim().toLowerCase();
+                          bool isRequestCall = requestCall == 'true' &&
+                              chat['NOMBRE_COMPLETO'].trim().toLowerCase() ==
+                                  requestCallName.trim().toLowerCase();
 
-print("Es una solicitud de llamada: $isRequestCall");
+                          print("Es una solicitud de llamada: $isRequestCall");
 
                           print("inicio de comparacion de llamad------");
                           print("Nombre del chat de llamada:" +
@@ -304,6 +323,22 @@ print("Es una solicitud de llamada: $isRequestCall");
                                             : Colors.black54),
                                   ),
                                   onTap: () async {
+                                    final String? elementoLLamante =
+                                        await CacheService()
+                                            .getData('elementoLLamante');
+                                    print("Valor de elementoLLamante: $elementoLLamante");
+                                    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ -elemento chat: ${chat['ELEMENTO_NUM']}");
+
+                                   
+                                    if (elementoLLamante.toString() ==
+                                        chat['ELEMENTO_NUM'].toString()) {
+                                           await CacheService()
+                                        .saveData('ringtoneKey', 'false');
+                                    await CacheService()
+                                        .saveData('requestCalling', 'false');
+                                      print(
+                                          "|@@··~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  Navegando a ChatListScreen, valor de ringtone: FALSE");
+                                    }
                                     // Navegar a ChatScreen y esperar resultado
                                     var result =
                                         await Navigator.pushReplacement(

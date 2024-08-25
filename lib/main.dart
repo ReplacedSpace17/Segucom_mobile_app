@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/RequestPermissionScreen.dart';
 import 'package:segucom_app/Services_background/CallingService.dart';
@@ -58,22 +61,20 @@ Future<SecurityContext> initializeSecurityContext() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
 
+ //var box = await Hive.openBox('testBox'); 
+  // Inicializa Awesome Notifications
   await AwesomeNotifications().requestPermissionToSendNotifications();
-  // Inicializa las notificaciones y el puerto de comunicación entre isolates
+  
+  // Inicializa notificaciones locales y el puerto de comunicación entre isolates
   await NotificationController.initializeLocalNotifications();
   await NotificationController.initializeIsolateReceivePort();
 
-  //await Geolocator.openLocationSettings();
-  //await Geolocator.requestPermission();
-  //await Geolocator.isLocationServiceEnabled();
-
-  //await Permission.microphone.request();
-  //await Permission.camera.request();
-  //SecurityContext securityContext = await initializeSecurityContext();
-  //HttpOverrides.global = MyHttpOverrides(securityContext);
+  // Inicia la aplicación
   runApp(SegucomApp());
 }
+
 
 class SegucomApp extends StatefulWidget {
   const SegucomApp({super.key});

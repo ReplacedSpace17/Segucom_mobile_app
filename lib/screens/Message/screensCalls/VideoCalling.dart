@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:http/http.dart' as http;
+import 'package:segucom_app/configBackend.dart';
 
 class ScreenCalling extends StatefulWidget {
   final RTCVideoRenderer localRenderer;
@@ -8,13 +10,17 @@ class ScreenCalling extends StatefulWidget {
   final VoidCallback onHangUp;
   final String callerName;
   final String callerNumber;
+  final String me; // Nuevo parámetro
+  final String destinatario; // Nuevo parámetro
 
   ScreenCalling({
     required this.localRenderer,
     required this.remoteRenderer,
     required this.onHangUp,
     required this.callerName,
-    required this.callerNumber, MediaStream? incomingStream,
+    required this.callerNumber,
+    required this.me, // Requerido
+    required this.destinatario, // Requerido
   });
 
   @override
@@ -24,6 +30,7 @@ class ScreenCalling extends StatefulWidget {
 class _ScreenCallingState extends State<ScreenCalling> {
   late Stopwatch _stopwatch;
   late Timer _timer;
+  bool isDisponibility = false;
 
   @override
   void initState() {
@@ -33,6 +40,7 @@ class _ScreenCallingState extends State<ScreenCalling> {
       setState(() {});
     });
     _stopwatch.start();
+    _checkDisponibilityPeriodically(); // Iniciar la verificación periódica
   }
 
   @override
@@ -42,13 +50,59 @@ class _ScreenCallingState extends State<ScreenCalling> {
     super.dispose();
   }
 
+  // Implementación de la verificación periódica de disponibilidad
+  void _checkDisponibilityPeriodically() {
+    _timer = Timer.periodic(Duration(seconds: 1), (Timer timer) async {
+      var response = await checkDisponibility(
+        widget.me, // Usar el nuevo parámetro me
+        widget.destinatario, // Usar el nuevo parámetro destinatario
+      );
+      if (response == 200) {
+        setState(() {
+          isDisponibility = response == 200;
+        });
+      }
+      if (response == 400) {
+        widget.onHangUp();
+        setState(() {
+          isDisponibility = response == 200;
+          // Aquí puedes realizar alguna acción adicional si es necesario
+        });
+      }
+      print(
+          '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  isDisponibility calling: $response');
+    });
+  }
+
+  // Función para comprobar disponibilidad de llamadas
+  Future<int> checkDisponibility(String me, String destinatario) async {
+    var url =
+        '${ConfigBackend.backendUrlComunication}/check-chatroom-status/$me/$destinatario';
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ calliing: " + url);
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+      );
+      // Regresar el statusCode
+      return response.statusCode;
+    } catch (e) {
+      print('Error sending message: $e');
+      // Regresar un código de estado de error, por ejemplo, 500
+      return 500;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: RTCVideoView(widget.remoteRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+            child: RTCVideoView(widget.remoteRenderer,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
           ),
           Positioned(
             left: 16.0,
@@ -56,7 +110,9 @@ class _ScreenCallingState extends State<ScreenCalling> {
             child: Container(
               width: 100.0,
               height: 150.0,
-              child: RTCVideoView(widget.localRenderer, mirror: true, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
+              child: RTCVideoView(widget.localRenderer,
+                  mirror: true,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
             ),
           ),
           Positioned(
@@ -74,18 +130,22 @@ class _ScreenCallingState extends State<ScreenCalling> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset('lib/assets/iconUser.png', width: 50, height: 50),
+                    Image.asset('lib/assets/iconUser.png',
+                        width: 50, height: 50),
                     SizedBox(width: 8.0),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        
                         Text(
                           widget.callerNumber,
                           style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
                         Text(
                           _formattedTime(),
+                          style: TextStyle(fontSize: 14, color: Colors.white),
+                        ),
+                        Text(
+                          'Disponibilidad: ${isDisponibility ? "Disponible" : "No disponible"}',
                           style: TextStyle(fontSize: 14, color: Colors.white),
                         ),
                       ],
@@ -117,8 +177,10 @@ class _ScreenCallingState extends State<ScreenCalling> {
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-                    child: Icon(Icons.call_end, color: Colors.white, size: 24),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0, vertical: 12.0),
+                    child: Icon(Icons.call_end,
+                        color: Colors.white, size: 24),
                   ),
                 ),
               ],

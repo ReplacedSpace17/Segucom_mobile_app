@@ -247,32 +247,9 @@ Future<void> checkPermissions() async {
                 Navigator.of(context).pop();
 
                 if (isVideoCall) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ScreenCalling(
-                        localRenderer: _localRenderer,
-                        remoteRenderer: _remoteRenderer,
-                        onHangUp: () => _hangUp(context),
-                        callerName: callerName,
-                        callerNumber: callerNumber,
-                      ),
-                    ),
-                  );
+                 
                 } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ScreenVoiceCalling(
-                        localRenderer: _localRenderer,
-                        remoteRenderer: _remoteRenderer,
-                        onHangUp: () => _hangUp(context),
-                        callerName: callerName,
-                        callerNumber: callerNumber,
-                        incomingStream: null,
-                      ),
-                    ),
-                  );
+                  
                 }
               },
             ),

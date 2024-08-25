@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:segucom_app/Services_background/CacheService.dart';
+import 'package:segucom_app/Services_background/Ringtone.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -13,7 +16,6 @@ class MessageService {
   late IO.Socket socket;
   late String _numElemento;
   String? lastMessageId;
-  
 
   MessageService(this._numElemento) {
     initializeSocket();
@@ -24,8 +26,8 @@ class MessageService {
       'transports': ['websocket'],
       'autoConnect': true, // Reconexión automática habilitada
       'reconnection': true,
-      'reconnectionAttempts': 10000, // Número de intentos de reconexión
-      'reconnectionDelay': 2000, // Retraso entre intentos de reconexión (ms)
+      'reconnectionAttempts': 100000000, // Número de intentos de reconexión
+      'reconnectionDelay': 1000, // Retraso entre intentos de reconexión (ms)
     });
 
     socket.on('connect', _onConnect);
@@ -121,7 +123,7 @@ class MessageService {
     }
   }
 
-  void _onRecivedAsignacion(dynamic data) {
+  Future<void> _onRecivedAsignacion(dynamic data) async {
     // Supongamos que _numElemento está definido en tu clase
 
     // Imprimir el mensaje recibido
@@ -159,76 +161,100 @@ class MessageService {
   }
 
   Future<void> _onReceivedCallRequest(dynamic data) async {
-  // Imprimir el mensaje recibido
-  print('Nueva solicitud de llamada recibida desde el servidor: $data');
+    // Imprimir el mensaje recibido
+    print('Nueva solicitud de llamada recibida desde el servidor: $data');
 
-  // Asegúrate de que data es un Map
-  if (data is Map) {
-    // Obtén el valor de 'from', 'callType' y 'callerName'
-    String from = data['to'];
-    String callType = data['type'];
-    String callerName = data['callerName'];
-    String callerNumber = data['from'];
+    // Asegúrate de que data es un Map
+    if (data is Map) {
+      // Obtén el valor de 'from', 'callType' y 'callerName'
+      String from = data['to'];
+      String callType = data['type'];
+      String callerName = data['callerName'];
+      String callerNumber = data['from'];
 
-    // Aquí puedes implementar la lógica que deseas realizar con el valor 'from'
-    print('Llamada solicitada por el elemento: $callerName ($callerNumber)');
-    print('Tipo de llamada: $callType');
+      // Aquí puedes implementar la lógica que deseas realizar con el valor 'from'
+      print('Llamada solicitada por el elemento: $callerName ($callerNumber)');
+      print('Tipo de llamada: $callType');
 
-    // Verificar si en from está _numElemento
-    if (from.toString() == _numElemento.toString()) {
-      // Si está, emite una notificación
-      
-      NotificationController.createNewNotification(
-        "Solicitud de llamada",
-        "Ingresa al chat de: $callerName ($callerNumber)"
-      );
-    //crear un prefs para guardar el numero y nombre de la persona que esta llamando
- 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-prefs.setString('requestCalling', 'true');
-print("Estableciendo llamada en true");
-prefs.setString('callerName', callerName);
-prefs.setString('callerNumber', callerNumber);
-print("Datos de llamada guardados: $callerName, $callerNumber");
+      // Verificar si en from está _numElemento
+      if (from.toString() == _numElemento.toString()) {
+        // Si está, emite una notificación
 
-     
+        NotificationController.createNewNotification("Solicitud de llamada",
+            "Ingresa al chat de: $callerName ($callerNumber)");
 
-  _playRingtoneAndVibrate();
-  }
+        // Inicializar SharedPreferences
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('requestCalling', 'true');
+        await prefs.setBool('ringtone', true);
+        await prefs.setString('callerName', callerName);
+        await prefs.setString('callerNumber', callerNumber);
 
-  } else {
-    print('Datos recibidos no son un Map válido.');
-  }
-}
+        await CacheService().saveData('ringtoneKey', 'true');
+        await CacheService().saveData('callerName', callerName);
+        await CacheService().saveData('requestCalling', 'true');
+        await CacheService().saveData('elementoLLamante', callerNumber.toString());
+        print("Estableciendo llamada en true");
+        print("Datos de llamada guardados: $callerName, $callerNumber");
 
-void _playRingtoneAndVibrate() {
-  final _audioPlayer = AudioPlayer();
-
-  // Inicia la reproducción del tono de llamada
-  _audioPlayer.setAsset('lib/assets/ringtone.mp3').then((_) {
-    _audioPlayer.play().catchError((error) {
-      print('Error reproduciendo tono de llamada: $error');
-    });
-  }).catchError((error) {
-    print('Error cargando tono de llamada: $error');
-  });
-
-  // Inicia la vibración
-  Vibration.hasVibrator().then((hasVibrator) {
-    if (hasVibrator == true) {
-      // Configura el patrón de vibración
-      Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
+        // Llamar a la función para manejar el ringtone y la vibración
+        await _playRingtoneAndVibrate();
+      }
+    } else {
+      print('Datos recibidos no son un Map válido.');
     }
-  }).catchError((error) {
-    print('Error al verificar la vibración: $error');
-  });
+  }
+
+  Future<void> _playRingtoneAndVibrate() async {
+    // Lee el valor del caché
+    final String? ringtoneValue = await CacheService().getData('ringtoneKey');
+
+    print("El valor del ring es: ---------------------------------------------------- "+ringtoneValue.toString());
+    if(ringtoneValue == 'true'){
+      AudioService().playRingtone();
+          // Inicia la vibración
+          Vibration.hasVibrator().then((hasVibrator) {
+            if (hasVibrator == true) {
+              // Configura el patrón de vibración
+              Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
+            }
+          }).catchError((error) {
+            print('Error al verificar la vibración: $error');
+          });
+    }
+    await Future.delayed(Duration(seconds: 11));
+    await _playRingtoneAndVibrate();
+  }
 }
 
+/*
 
-
-
-
-
-
-
-}
+Future<void> _playRingtoneAndVibrate() async {
+        // Lee el valor actualizado de SharedPreferences
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        var ringtone = prefs.getBool('ringtone');
+        print("##################################### Ringtone: $ringtone");
+      
+        if (ringtone == true) {
+          AudioService().playRingtone();
+          // Inicia la vibración
+          Vibration.hasVibrator().then((hasVibrator) {
+            if (hasVibrator == true) {
+              // Configura el patrón de vibración
+              Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
+            }
+          }).catchError((error) {
+            print('Error al verificar la vibración: $error');
+          });
+      
+          // Llamada recursiva después de un tiempo específico
+          await Future.delayed(Duration(seconds: 11));
+          
+          // Vuelve a llamar al método después de la espera
+          await _playRingtoneAndVibrate();
+        } else {
+          // Detener la reproducción y vibración si el valor es false
+          AudioService().stopRingtone();
+        }
+      }
+ */

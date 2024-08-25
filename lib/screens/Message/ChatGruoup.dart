@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
@@ -10,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/screens/Message/ScreenListChats.dart';
+import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:image_picker/image_picker.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -76,6 +78,8 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
 
   bool _isSendingVideo = false; // Agrega esta línea
 
+bool _isMounted = false;
+
   Future<void> _initialize() async {
     await _recorder.openRecorder();
     await _player.openPlayer();
@@ -105,6 +109,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       // Si no se pasaron mensajes, ejecutar fetchMessages
       fetchMessages();
     }
+  _isMounted = true;
 
     _initialize(); // Inicializar grabador de audio
 
@@ -114,7 +119,7 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       'autoConnect': true, // Reconexión automática habilitada
       'reconnection': true,
       'reconnectionAttempts': 10000, // Número de intentos de reconexión
-      'reconnectionDelay': 2000, // Retraso entre intentos de reconexión (ms)
+      'reconnectionDelay': 1000, // Retraso entre intentos de reconexión (ms)
     });
 
     // Manejo de eventos del socket
@@ -137,24 +142,25 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
     //fetchMessages(); // Si decides llamar a fetchMessages aquí, asegúrate de que no esté duplicado
   }
 
-  @override
-  void dispose() {
-    // Cerrar el grabador y reproductor de audio
-    _recorder.closeRecorder();
-    _player.closePlayer();
-
-    // Liberar el controlador de video si está inicializado
-    if (_videoController != null) {
-      _videoController!.dispose();
-    }
-
-    // Liberar el controlador de mensaje y desconectar el socket
-    messageController.dispose();
-    socket.off('receiveMessage');
+@override
+void dispose() {
+  _recorder.closeRecorder();
+  _player.closePlayer();
+  messages.clear();
+  
+  // Desconectar el socket
+  if (socket != null) {
     socket.disconnect();
-
-    super.dispose(); // Llamar a super.dispose() al final
+    socket.dispose();
   }
+
+  if (_videoController != null) {
+    _videoController!.dispose();
+  }
+
+  super.dispose();
+}
+
 
 //////////////////////// audio
   Future<void> _startRecording() async {
@@ -315,53 +321,61 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
       print('Error fetching messages: $e');
     }
   }
+void _handleReceivedMessage(dynamic data) {
+  print("mensaje recibido en handle");
 
-  void _handleReceivedMessage(dynamic data) {
-    print("mensaje recibido en handle");
-    // Verificar si el mensaje pertenece al grupo actual
-    if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
-      var receivedMessage = {
-        'MENSAJE_ID': data['MENSAJE_ID'],
-        'FECHA': data['FECHA'],
-        'REMITENTE': data['REMITENTE'],
-        'MENSAJE': data['MENSAJE'],
-        'MEDIA': data['MEDIA'],
-        'UBICACION': data['UBICACION'],
-        'NOMBRE': data['NOMBRE'],
-      };
+  // Verificar si el mensaje pertenece al grupo actual
+  if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
+    NotificationController.createNewNotification(
+        "Mensaje de grupo", "De: " + widget.chatData["NOMBRE_COMPLETO"]);
 
-      // Verificar si el mensaje ya existe en la lista de mensajes
-      bool messageExists = messages.any((msg) =>
-          msg['MENSAJE_ID'].toString() ==
-          receivedMessage['MENSAJE_ID'].toString());
+    var receivedMessage = {
+      'MENSAJE_ID': data['MENSAJE_ID'],
+      'FECHA': data['FECHA'],
+      'REMITENTE': data['REMITENTE'],
+      'MENSAJE': data['MENSAJE'],
+      'MEDIA': data['MEDIA'],
+      'UBICACION': data['UBICACION'],
+      'NOMBRE': data['NOMBRE'],
+    };
 
-      if (!messageExists) {
-        print("Mensaje no existe en la lista de mensajes");
-        if (mounted) {
-          print("componente montado");
-          setState(() {
-            // Ajustar la URL completa del servidor
-            if (receivedMessage['MEDIA'] == 'IMAGE') {
-              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-            }
-            if (receivedMessage['MEDIA'] == 'VIDEO') {
-              receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
-            }
-            messages.add(receivedMessage);
-          });
+    // Verificar si el mensaje ya existe en la lista de mensajes
+    bool messageExists = messages.any((msg) =>
+        msg['MENSAJE_ID'].toString() ==
+        receivedMessage['MENSAJE_ID'].toString());
 
-          // Desplazarse al final de la lista de mensajes
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => _scrollToBottom());
-        }
-      }else{
-        print("Mensaje ya existe en la lista de mensajes");
+    if (!messageExists) {
+      print("Mensaje no existe en la lista de mensajes");
+      
+      // Verificar si el widget está montado antes de llamar a setState
+      if (mounted) {
+        setState(() {
+          print("ENTRO EN EL SETSTATE");
+
+          // Ajustar la URL completa del servidor si es una imagen o video
+          if (receivedMessage['MEDIA'] == 'IMAGE' || receivedMessage['MEDIA'] == 'VIDEO') {
+            receivedMessage['MENSAJE'] = '${receivedMessage['UBICACION']}';
+          }
+
+          // Agregar el nuevo mensaje a la lista
+          messages.add(receivedMessage);
+          print("AGREGADO A LA LISTA DE MENSAJES");
+        });
+
+        // Desplazarse al final de la lista de mensajes
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        print(messages.last);
+      } else {
+        print("componente no montado");
       }
     } else {
-      print(
-          'Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
+      print("Mensaje ya existe en la lista de mensajes");
     }
+  } else {
+    print('Mensaje recibido no pertenece al grupo actual: ${data['GRUPO_ID']}');
   }
+}
+
 
   Future<void> sendMessage(String message) async {
     var currentDate = DateTime.now();
@@ -486,12 +500,12 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
             messages.add(newMessage);
             _isUploading = false; // Finalizar carga
           });
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        // Desplazarse solo si aún está montado
-        _scrollToBottom();
-      }
-    });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              // Desplazarse solo si aún está montado
+              _scrollToBottom();
+            }
+          });
         }
       } else {
         throw Exception('Failed to send media message');
@@ -950,15 +964,14 @@ class _ChatScreenGroupState extends State<ChatScreenGroup> {
           ],
         ),
         leading: IconButton(
-  icon: Icon(Icons.arrow_back),
-  onPressed: () {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => ChatListScreen()),
-    );
-  },
-),
-
+          icon: Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => ChatListScreen()),
+            );
+          },
+        ),
       ),
       body: Column(
         children: [
