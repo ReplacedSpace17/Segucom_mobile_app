@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:segucom_app/screens/Home/Options/Option1.dart';
+import 'package:segucom_app/screens/Login/login_screen.dart';
+import 'package:segucom_app/screens/Register/register_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -46,9 +48,13 @@ class HomeScreen extends StatelessWidget {
                           ),
                           padding: EdgeInsets.symmetric(vertical: 13.0),
                         ),
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/login');
-                        },
+                       onPressed: () {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => LoginScreen()),
+  );
+},
+
                         child: Text(
                           'INICIAR SESIÓN',
                           style: TextStyle(
@@ -73,9 +79,13 @@ class HomeScreen extends StatelessWidget {
                           ),
                           padding: EdgeInsets.symmetric(vertical: 13.0),
                         ),
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/register');
-                        },
+                       onPressed: () {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => RegisterScreen()),
+  );
+},
+
                         child: Text(
                           'REGISTRARTE',
                           style: TextStyle(

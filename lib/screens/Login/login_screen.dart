@@ -1,6 +1,7 @@
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:segucom_app/screens/App.dart';
 import 'package:segucom_app/screens/UpdateAndroidID/UpdateIDAndroid.dart';
 import 'dart:convert';
 import '../../configBackend.dart';
@@ -114,7 +115,7 @@ Future<void> _loginUser(String phone, String password) async {
     passwordController.clear();
 
     // Navegar al menú y pasar los datos del usuario como argumentos
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => MenuScreen()),
     );
@@ -200,7 +201,10 @@ Widget build(BuildContext context) {
                 child: IconButton(
                   icon: Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () {
-                    Navigator.pop(context);
+                     Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => HomeScreen()),
+  );
                   },
                 ),
               ),

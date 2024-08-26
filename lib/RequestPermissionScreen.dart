@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:segucom_app/RequestIncompatibility.dart';
 import 'package:segucom_app/screens/App.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -76,11 +77,14 @@ Future<void> _requestPermissions() async {
     print("Permisos de ubicación concedidos.");
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('configPermissions', 'true');
-
-    // Navega a HomeScreen sin usar Navigator
     Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => MyAppIncompatibility()),
+    );
+    // Navega a HomeScreen sin usar Navigator 
+   /* Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => HomeScreen()),
     );
+    */
   } else if (permission == LocationPermission.deniedForever) {
     // Permiso de ubicación denegado permanentemente
     print("Permiso de ubicación denegado permanentemente.");
@@ -165,7 +169,7 @@ Future<void> _showLocationPermissionAlert() async {
                   ),
                   child: Text(
                     'Verificar',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                    style: TextStyle(fontSize: 13, color: Colors.white),
                   ),
                 ),
               ),
