@@ -90,27 +90,45 @@ class _ScreenPaseListaState extends State<ScreenPaseLista> {
     // Ocultar Snackbar de "Verificando permisos"
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    if (response.statusCode == 200) {
-      //obtener el cuerpo de la respuesta
-      final body = jsonDecode(response.body);
-      final EncabezadoID = body['PASENCA_ID'];
-      //guardar con shared preferences el grupoID
-      final prefs = await SharedPreferences.getInstance();
-      prefs.setInt('ID_Encabezado', EncabezadoID);
-      print("Encabezado : " + EncabezadoID.toString());
-      //enviar a la pantalla de pase de lista ScreenPaseLista()
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ScreenScanQR()),
-      );
-    } else {
+    if (response.statusCode == 400) {
       //mostrar un mensaje de que no tiene permisos
       ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Ya existe un pase de lista para este grupo y por el mismo elemento el mismo día'),
+        ),
+      );
+    } else {
+      if (response.statusCode == 200) {
+        //obtener el cuerpo de la respuesta
+        final body = jsonDecode(response.body);
+        final EncabezadoID = body['PASENCA_ID'];
+        //guardar con shared preferences el grupoID
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setInt('ID_Encabezado', EncabezadoID);
+        print("Encabezado : " + EncabezadoID.toString());
+        //enviar a la pantalla de pase de lista ScreenPaseLista()
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ScreenScanQR()),
+        );
+      }
+      else{
+ ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No se ha podido iniciar el pase de lista'),
         ),
       );
+      }
     }
+/*
+    
+   else {
+      //mostrar un mensaje de que no tiene permisos
+     
+    }
+
+    */
   }
 
   @override
@@ -154,49 +172,51 @@ class _ScreenPaseListaState extends State<ScreenPaseLista> {
                     fontWeight: FontWeight.w400,
                     color: Color(0xFF073560)),
               ),
-             SizedBox(height: 10),
+              SizedBox(height: 10),
 // Menú
-Expanded(
-  child: ListView(
-    children: [
-      _buildMenuItem(
-        'Iniciar Pase de Lista',
-        '',
-        'lib/assets/icons/iconPaseLista.png',
-        Colors.blue,
-        'Selecciona para comenzar',
-        () async {
-          // Instancia de shared preferences
-          final prefs = await SharedPreferences.getInstance();
+              Expanded(
+                child: ListView(
+                  children: [
+                    _buildMenuItem(
+                      'Iniciar Pase de Lista',
+                      '',
+                      'lib/assets/icons/iconPaseLista.png',
+                      Colors.blue,
+                      'Selecciona para comenzar',
+                      () async {
+                        // Instancia de shared preferences
+                        final prefs = await SharedPreferences.getInstance();
 
-          // Obtener el numero de elemento, manejar null
-          String? numeroElemento = prefs.getString('NumeroElemento');
-          if (numeroElemento == null) {
-            // Manejar caso de null, tal vez mostrar un mensaje o usar un valor por defecto
-            print("Numero de elemento no encontrado");
-            return;
-          }
+                        // Obtener el numero de elemento, manejar null
+                        String? numeroElemento =
+                            prefs.getString('NumeroElemento');
+                        if (numeroElemento == null) {
+                          // Manejar caso de null, tal vez mostrar un mensaje o usar un valor por defecto
+                          print("Numero de elemento no encontrado");
+                          return;
+                        }
 
-          // Obtener el id del grupo, manejar null
-          int? idGrupo = prefs.getInt('grupoID');
-          if (idGrupo == null) {
-            // Manejar caso de null, tal vez mostrar un mensaje o usar un valor por defecto
-            print("ID del grupo no encontrado");
-            return;
-          }
+                        // Obtener el id del grupo, manejar null
+                        int? idGrupo = prefs.getInt('grupoID');
+                        if (idGrupo == null) {
+                          // Manejar caso de null, tal vez mostrar un mensaje o usar un valor por defecto
+                          print("ID del grupo no encontrado");
+                          return;
+                        }
 
-          // Imprimir ambos
-          print("Numero de elemento: $numeroElemento");
-          print("ID del grupo: $idGrupo");
+                        // Imprimir ambos
+                        print("Numero de elemento: $numeroElemento");
+                        print("ID del grupo: $idGrupo");
+                        print("Iniciar pase de lista");
 
-          // Iniciar pase de lista
-           _IniciarPaseLista(context, idGrupo.toString(), numeroElemento);
-        },
-      ),
-    ],
-  ),
-),
-
+                        // Iniciar pase de lista
+                        _IniciarPaseLista(
+                            context, idGrupo.toString(), numeroElemento);
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

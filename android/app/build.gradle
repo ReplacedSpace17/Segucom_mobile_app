@@ -31,11 +31,9 @@ if (keystorePropertiesFile.exists()) {
     throw new GradleException("Keystore properties file not found: " + keystorePropertiesFile.path)
 }
 
-
 android {
-    compileSdkVersion 34
+    compileSdkVersion flutter.compileSdkVersion
     namespace "com.segucom.segucom_app"
-    compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -54,7 +52,7 @@ android {
     defaultConfig {
         applicationId "com.segucom.segucom_app"
         minSdkVersion 30
-        targetSdkVersion 34  // Aquí se configura el SDK destino a 34
+        targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
@@ -73,11 +71,12 @@ android {
             signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
-            // Proguard configuration files
+            // Archivo de configuración Proguard para optimización (si lo necesitas)
             // proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
+
 
 flutter {
     source '../..'

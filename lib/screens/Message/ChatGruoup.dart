@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:segucom_app/Services_background/MessagesService.dart';
 import 'package:segucom_app/screens/Message/ScreenListChats.dart';
 import 'package:segucom_app/screens/NotificationsClass/NotificationHome.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -326,8 +327,7 @@ void _handleReceivedMessage(dynamic data) {
 
   // Verificar si el mensaje pertenece al grupo actual
   if (data['GRUPO_ID'].toString() == widget.idGrupo.toString()) {
-    NotificationController.createNewNotification(
-        "Mensaje de grupo", "De: " + widget.chatData["NOMBRE_COMPLETO"]);
+   
 
     var receivedMessage = {
       'MENSAJE_ID': data['MENSAJE_ID'],
@@ -966,6 +966,8 @@ void _handleReceivedMessage(dynamic data) {
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
           onPressed: () {
+             // final MessageService messageService = MessageService(widget.numElemento.toString());
+
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => ChatListScreen()),

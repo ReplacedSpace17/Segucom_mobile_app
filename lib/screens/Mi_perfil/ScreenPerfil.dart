@@ -307,7 +307,7 @@ final SharedPreferences prefs = await SharedPreferences.getInstance();
                         onPressed: () async {
                           final SharedPreferences prefs = await SharedPreferences.getInstance();
 prefs.setString('authToken', 'NULL');
-                          Navigator.push(
+                          Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
                                 builder: (context) => HomeScreen()),

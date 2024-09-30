@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/RequestPermissionScreen.dart';
 import 'package:segucom_app/Services_background/CallingService.dart';
+import 'package:segucom_app/Services_background/GetGroupsID.dart';
 import 'package:segucom_app/Services_background/MessagesService.dart';
 import 'package:segucom_app/Services_background/VolumeService.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
@@ -92,7 +93,13 @@ class _SegucomAppState extends State<SegucomApp> {
 
   @override
   void initState() {
-    //NotificationController.startListeningNotificationEvents();
+    NotificationController.startListeningNotificationEvents();
+    NotificationController.initializeLocalNotifications();
+      NotificationController
+      .initializeLocalNotifications(); // Asegúrate de inicializar aquí
+ // Crea el canal aquí
+    // Inicializa el servicio de mensajes
+    
 
     // Inicializa el servicio de llamadas
     /*
@@ -348,7 +355,8 @@ void onStart(ServiceInstance service) async {
 
   if (service is AndroidServiceInstance) {
     service.setAsForegroundService();
-
+    
+  WidgetsFlutterBinding.ensureInitialized();
     service.setForegroundNotificationInfo(
       title: 'SEGUCOM SERVICE',
       content: 'Service is running in the background',
@@ -359,6 +367,7 @@ void onStart(ServiceInstance service) async {
   final UbicationService _ubicationService = UbicationService();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+      
 
   await NotificationController
       .initializeLocalNotifications(); // Asegúrate de inicializar aquí
@@ -373,9 +382,13 @@ void onStart(ServiceInstance service) async {
   NotificationController.startListeningNotificationEvents();
 
   final VolumeService volumeService = VolumeService(_numElemento, _tel);
+ final MessageService messageService = MessageService(_numElemento);
+   
+final GroupService groupIDService = GroupService(_numElemento.toString());
+
 
   if (authToken != null) {
-    final MessageService messageService = MessageService(_numElemento);
+   
 
     Timer.periodic(const Duration(minutes: 10), (timer) async {
       if (service is AndroidServiceInstance &&
@@ -384,6 +397,23 @@ void onStart(ServiceInstance service) async {
 
         try {
           await _ubicationService.sendLocation("", _tel, _numElemento);
+          //await groupIDService.getIDS_Groups();
+
+        } catch (e) {
+          print("Error al enviar ubicación: $e");
+        }
+      }
+    });
+
+    Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (service is AndroidServiceInstance &&
+          await service.isForegroundService()) {
+        // Configurar la notificación en primer plano
+
+        try {
+          //await _ubicationService.sendLocation("", _tel, _numElemento);
+          await groupIDService.getIDS_Groups();
+
         } catch (e) {
           print("Error al enviar ubicación: $e");
         }
@@ -437,7 +467,7 @@ Future<void> initializeService() async {
     notificationChannelId,
     'MY FOREGROUND SERVICE',
     description: 'This channel is used for important notifications.',
-    importance: Importance.high,
+    importance: Importance.max,
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -454,6 +484,7 @@ Future<void> initializeService() async {
       onStart: onStart,
       autoStart: true,
       isForegroundMode: true,
+      
       notificationChannelId: notificationChannelId,
       initialNotificationTitle: 'SEGUCOM SERVICE',
       initialNotificationContent: 'Service is running in the background',

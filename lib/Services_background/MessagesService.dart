@@ -9,6 +9,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:segucom_app/configBackend.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:segucom_app/Services_background/CacheService.dart';
 
 import 'package:vibration/vibration.dart';
 
@@ -25,13 +26,19 @@ class MessageService {
     socket = IO.io('${ConfigBackend.backendUrlComunication}', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true, // Reconexión automática habilitada
+      'forceNew': false, // Fuerza la creación de una nueva conexión
+
       'reconnection': true,
       'reconnectionAttempts': 100000000, // Número de intentos de reconexión
       'reconnectionDelay': 1000, // Retraso entre intentos de reconexión (ms)
     });
 
     socket.on('connect', _onConnect);
-    socket.on('disconnect', _onDisconnect);
+    socket.on('disconnect', (_) {
+      print('Disconnected from server');
+      socket.connect(); // Intentar reconectar inmediatamente
+    });
+
     socket.on('connect_error', _onConnectError);
     socket.on('receiveMessage', _onReceiveMessage);
     socket.on('notificarAsignacion', _onRecivedAsignacion);
@@ -73,28 +80,83 @@ class MessageService {
     print('Error de conexión: $data');
   }
 
-  void _onReceiveMessage(data) {
+  Future<void> _onReceiveMessage(data) async {
     print('Nuevo mensaje recibido desde SERVICE: $data');
-    String? messageId =
-        data['messageId']; // Asumiendo que cada mensaje tiene un ID único
+
+    String? gruposID = await CacheService().getData('groupsID');
+    print("Grupos a donde pertenece: " + gruposID!);
+
+    if (data['GRUPO_ID'] != null) {
+      // Convertimos el string '1,4,2' en una lista de strings ['1', '4', '2']
+      List<String> gruposList = gruposID.split(',');
+
+      // Comparamos si data['GRUPO_ID'] está en la lista
+      if (gruposList.contains(data['GRUPO_ID'].toString())) {
+        if (data['REMITENTE'].toString() == _numElemento.toString()) {
+
+        }else{
+           _handleGroupMessage(data);
+        print("Mensaje de grupo");
+        }
+        print("Mensaje propio");
+       
+      }
+    }
+
+    //V--------------------------------------ALIDAR SI to es _numElemento
+    if (data['to'].toString() == _numElemento.toString()) {
+      _handlePrivateMessage(data);
+    }
+    //V--------------------------------------ALIDAR SI to es _numElemento
+
+    String? messageId = data['messageId'];
 
     if (messageId != null && messageId == lastMessageId) {
       print('Mensaje duplicado detectado y descartado');
       return;
     }
 
-    lastMessageId = messageId;
+    lastMessageId = messageId; // Actualizar después de la validación
+/*
+Nuevo mensaje enviado: {
+  MENSAJE_ID: 1725835674666,
+  FECHA: '2024-09-08 16:47:54',
+  REMITENTE: '80000',
+  MENSAJE: 'gggg',
+  MEDIA: 'TXT',
+  UBICACION: 'NA',
+  GRUPO_ID: '1',
+  ELEMENTO_NUMERO: '80000',
+  NOMBRE_REMITENTE: '',
+  groupId: '1',
+  NOMBRE: '',
+  GRUPO_DESCRIP: 'GRUPO DE COMUNICACION 1'
+}
+ */
+
+/* comente esto, funciona
 
     if (data['to'] != null) {
-      print("mnsg privado");
-      _handlePrivateMessage(data);
+        print("mnsg privado");
+        _handlePrivateMessage(data);
     } else if (data['GRUPO_DESCRIP'] != null) {
-      _handleGroupMessage(data);
-      print("mnsg de grupo");
+        _handleGroupMessage(data);
+        print("mnsg de grupo");
     }
+
+
+    */
   }
 
-  void _handlePrivateMessage(data) {
+  Future<void> _handlePrivateMessage(data) async {
+    //validar el RECEPTOR que es el numero de elemento
+    await CacheService()
+        .saveData(data['NOMBRE'].toString().replaceAll(' ', ''), 'true');
+
+    //await CacheService().saveData(data['REMITENTE'].toString(), 'true');
+    await CacheService().saveData('prueba', 'true');
+    print("Guardando mensaje en cache de: " +
+        data['NOMBRE'].toString().replaceAll(' ', ''));
     if (data['MEDIA'] == 'AUDIO') {
       NotificationController.createNewNotification(
           "Mensaje de " + data['NOMBRE'], "Nota de voz");
@@ -107,7 +169,11 @@ class MessageService {
     }
   }
 
-  void _handleGroupMessage(data) {
+  Future<void> _handleGroupMessage(data) async {
+    await CacheService()
+        .saveData(data['GRUPO_DESCRIP'].toString().replaceAll(' ', ''), 'true');
+    print("Guardando mensaje en cache de: " +
+        data['GRUPO_DESCRIP'].toString().replaceAll(' ', ''));
     if (data['MEDIA'] == 'AUDIO') {
       NotificationController.createNewNotification(
           "Mensaje de " + data['GRUPO_DESCRIP'], "Nota de voz");
@@ -184,6 +250,8 @@ class MessageService {
             "Ingresa al chat de: $callerName ($callerNumber)");
 
         // Inicializar SharedPreferences
+        //fgfdf
+
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('requestCalling', 'true');
         await prefs.setBool('ringtone', true);
@@ -193,7 +261,8 @@ class MessageService {
         await CacheService().saveData('ringtoneKey', 'true');
         await CacheService().saveData('callerName', callerName);
         await CacheService().saveData('requestCalling', 'true');
-        await CacheService().saveData('elementoLLamante', callerNumber.toString());
+        await CacheService()
+            .saveData('elementoLLamante', callerNumber.toString());
         print("Estableciendo llamada en true");
         print("Datos de llamada guardados: $callerName, $callerNumber");
 
@@ -209,52 +278,22 @@ class MessageService {
     // Lee el valor del caché
     final String? ringtoneValue = await CacheService().getData('ringtoneKey');
 
-    print("El valor del ring es: ---------------------------------------------------- "+ringtoneValue.toString());
-    if(ringtoneValue == 'true'){
+    print(
+        "El valor del ring es: ---------------------------------------------------- " +
+            ringtoneValue.toString());
+    if (ringtoneValue == 'true') {
       AudioService().playRingtone();
-          // Inicia la vibración
-          Vibration.hasVibrator().then((hasVibrator) {
-            if (hasVibrator == true) {
-              // Configura el patrón de vibración
-              Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
-            }
-          }).catchError((error) {
-            print('Error al verificar la vibración: $error');
-          });
+      // Inicia la vibración
+      Vibration.hasVibrator().then((hasVibrator) {
+        if (hasVibrator == true) {
+          // Configura el patrón de vibración
+          Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
+        }
+      }).catchError((error) {
+        print('Error al verificar la vibración: $error');
+      });
     }
     await Future.delayed(Duration(seconds: 11));
     await _playRingtoneAndVibrate();
   }
 }
-
-/*
-
-Future<void> _playRingtoneAndVibrate() async {
-        // Lee el valor actualizado de SharedPreferences
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        var ringtone = prefs.getBool('ringtone');
-        print("##################################### Ringtone: $ringtone");
-      
-        if (ringtone == true) {
-          AudioService().playRingtone();
-          // Inicia la vibración
-          Vibration.hasVibrator().then((hasVibrator) {
-            if (hasVibrator == true) {
-              // Configura el patrón de vibración
-              Vibration.vibrate(pattern: [500, 1000, 500, 2000]);
-            }
-          }).catchError((error) {
-            print('Error al verificar la vibración: $error');
-          });
-      
-          // Llamada recursiva después de un tiempo específico
-          await Future.delayed(Duration(seconds: 11));
-          
-          // Vuelve a llamar al método después de la espera
-          await _playRingtoneAndVibrate();
-        } else {
-          // Detener la reproducción y vibración si el valor es false
-          AudioService().stopRingtone();
-        }
-      }
- */

@@ -81,6 +81,8 @@ class _ChatScreenState extends State<ChatScreen> {
   ///
   String _callerName = "Usuario";
   String _callerNumber = "477";
+  bool _isDialogShowing = false; // Variable para controlar si el diálogo está visible
+
 
   Future<void> _initialize() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -150,7 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     prefs.setString('requestCalling', 'false');
 
-    final MessageService messageService = MessageService(widget.numElemento.toString());
+    // final MessageService messageService = MessageService(widget.numElemento.toString());
 
   }
 
@@ -180,6 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _remoteRenderer.dispose();
     _localStream?.dispose();
     _peerConnection?.close();
+    _peerConnection?.dispose();
     _timer?.cancel();
     super.dispose();
   }
@@ -231,8 +234,17 @@ class _ChatScreenState extends State<ChatScreen> {
       var description = RTCSessionDescription(data['sdp'], data['type']);
       await _peerConnection?.setRemoteDescription(description);
 
-      _showCallDialog(description, data['isVideoCall'], data['callerName'],
-          data['callerNumber']);
+    if (!_isDialogShowing) { // Verifica si ya hay un diálogo visible
+    _isDialogShowing = true; // Marca el diálogo como visible
+    
+    // Muestra el diálogo
+    _showCallDialog(description, data['isVideoCall'], data['callerName'], data['callerNumber']);
+    
+    // Aquí puedes restablecer la variable cuando se cierre el diálogo.
+    // Supongamos que `_showCallDialog` es una función que llama a `showDialog`.
+    // En el callback del botón de aceptación o cancelación del diálogo, debes asegurarte
+    // de establecer `_isDialogShowing = false` manualmente.
+  }
     });
 
     _socket?.on('answer', (data) async {
@@ -577,29 +589,53 @@ class _ChatScreenState extends State<ChatScreen> {
     */
   }
 
-  Future<void> _hangUp() async {
-    _localStream?.getTracks().forEach((track) {
-      track.stop();
-    });
+ Future<void> _hangUp() async {
+  // Detener las pistas y limpiar la conexión
+  _localStream?.getTracks().forEach((track) {
+    track.stop();
+  });
 
-    _localStream?.dispose();
-    _peerConnection?.close();
-    _createPeerConnection();
+  _localStream?.dispose();
+  _peerConnection?.close();
+  _createPeerConnection();
 
-    Navigator.pop(context);
+  // Primero ejecuta Navigator.pop
+  Navigator.pop(context);
 
-    setState(() {
-      _inCall = false;
-    });
-    // Cerrar la aplicación
-    /*
+  // Luego espera un breve momento antes de realizar la siguiente navegación
+  await Future.delayed(const Duration(milliseconds: 1000));
+
+  // Ahora ejecuta Navigator.pushReplacement
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => ChatListScreen()),
+  );
+
+  /*
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ScreenListChats(
+        numElemento: widget.numElemento,
+      ),
+    ),
+  );
+  */
+
+  // Cambiar el estado de la llamada
+  setState(() {
+    _inCall = false;
+  });
+
+  // Cerrar la aplicación (si es necesario)
+  /*
   if (Platform.isAndroid || Platform.isIOS) {
     // Cierra la aplicación
     exit(0);
   }
-  
   */
-  }
+}
+
 
   void _showCallDialog(RTCSessionDescription description, bool isVideoCall,
       String callerName, String callerNumber) async {
@@ -655,58 +691,70 @@ class _ChatScreenState extends State<ChatScreen> {
                 Navigator.of(context).pop();
               },
             ),
-            TextButton(
-              child: const Text('Aceptar'),
-              onPressed: () async {
-                _audioPlayer.stop();
-                _isRinging = false;
+         TextButton(
+  child: const Text('Aceptar'),
+  onPressed: () async {
+    if (isDisponibility) {
+      _isDialogShowing = false;
+      _audioPlayer.stop();
+      _isRinging = false;
 
-                await _peerConnection?.setRemoteDescription(description);
-                var answer = await _peerConnection?.createAnswer();
-                await _peerConnection?.setLocalDescription(answer!);
-                _socket?.emit('answer', {
-                  'to': widget.chatData['ELEMENTO_NUM'],
-                  'sdp': answer?.sdp,
-                  'type': answer?.type,
-                });
+      await _peerConnection?.setRemoteDescription(description);
+      var answer = await _peerConnection?.createAnswer();
+      await _peerConnection?.setLocalDescription(answer!);
+      _socket?.emit('answer', {
+        'to': widget.chatData['ELEMENTO_NUM'],
+        'sdp': answer?.sdp,
+        'type': answer?.type,
+      });
 
-                Navigator.of(context).pop();
+      Navigator.of(context).pop();
 
-                if (isVideoCall) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ScreenCalling(
-                        localRenderer: _localRenderer,
-                        remoteRenderer: _remoteRenderer,
-                        onHangUp: _hangUp,
-                        callerName: callerName,
-                        callerNumber: callerNumber,
-                           me: widget.numElemento.toString(),
-      destinatario: widget.chatData['ELEMENTO_NUM'].toString(),
-                      ),
-                    ),
-                  );
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ScreenVoiceCalling(
-                        localRenderer: _localRenderer,
-                        remoteRenderer: _remoteRenderer,
-                        onHangUp: _hangUp,
-                        callerName: callerName,
-                        callerNumber: callerNumber,
-                        incomingStream: null,
-                         me: widget.numElemento.toString(),
-      destinatario: widget.chatData['ELEMENTO_NUM'].toString(),
-                      ),
-                    ),
-                  );
-                }
-              },
+      if (isVideoCall) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ScreenCalling(
+              localRenderer: _localRenderer,
+              remoteRenderer: _remoteRenderer,
+              onHangUp: _hangUp,
+              callerName: callerName,
+              callerNumber: callerNumber,
+              me: widget.numElemento.toString(),
+              destinatario: widget.chatData['ELEMENTO_NUM'].toString(),
             ),
-          ],
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ScreenVoiceCalling(
+              localRenderer: _localRenderer,
+              remoteRenderer: _remoteRenderer,
+              onHangUp: _hangUp,
+              callerName: callerName,
+              callerNumber: callerNumber,
+              incomingStream: null,
+              me: widget.numElemento.toString(),
+              destinatario: widget.chatData['ELEMENTO_NUM'].toString(),
+            ),
+          ),
+        );
+      }
+    } else {
+      
+      Navigator.of(context).pop();
+      _isDialogShowing = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La llamada ha finalizado.'),
+        ),
+      );
+    }
+  },
+),
+ ],
         );
       },
     );
@@ -1214,6 +1262,7 @@ class _ChatScreenState extends State<ChatScreen> {
             IconButton(
               icon: Icon(Icons.arrow_back), // Flecha de retroceso
               onPressed: () {
+                  
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => ChatListScreen()),

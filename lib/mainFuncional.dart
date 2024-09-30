@@ -168,7 +168,7 @@ class _SplashScreenState extends State<SplashScreen> {
           final Map<String, dynamic> userData = jsonDecode(response.body);
           print('Datos del usuario: $userData');
           final String _numElemento = prefs.getString('NumeroElemento')!;
-          final MessageService messageService = MessageService(_numElemento);
+        //  final MessageService messageService = MessageService(_numElemento);
           // Navegar al menú principal u otra pantalla segura
           Navigator.pushReplacementNamed(context, '/menu');
         } else {
@@ -299,7 +299,7 @@ void onStart(ServiceInstance service) async {
 
   final VolumeService volumeService =
       VolumeService(_numElemento, _tel); // Inicializar VolumeService
-  final MessageService messageService = MessageService(_numElemento);
+ // final MessageService messageService = MessageService(_numElemento);
 
   if (authToken != null) {
 //INICIA EL SERVICIO DE MENSAJES

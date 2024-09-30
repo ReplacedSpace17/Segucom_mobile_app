@@ -36,6 +36,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   late Future<List<dynamic>> futureChats;
   late Future<List<dynamic>> futureChatsGroups;
+
   String _numElemento = '';
   String _searchQuery = '';
 
@@ -46,17 +47,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
   String requestCallName = '';
   String requestCallNumber = '';
   Timer? _timer;
+  String messageNotRead = '';
 
+  List<String> chatsWithNewMessages = [];
   @override
   void initState() {
     super.initState();
     getCallerInfo();
     _getrefresh();
-    _loadNumElemento().then((_) {
+    _loadNumElemento().then((_) async {
       setState(() {
         futureChats = fetchChats();
         futureChatsGroups = fetchChatsGroups();
       });
+
+      // Esperar a que futureChats y futureChatsGroups se resuelvan con async/await
+      List<dynamic> dynamicChats = await futureChats;
+      List<dynamic> dynamicChatsGroups = await futureChatsGroups;
+
+      // Convertir List<dynamic> a List<Map<String, dynamic>>
+      List<Map<String, dynamic>> chats =
+          dynamicChats.map((chat) => chat as Map<String, dynamic>).toList();
+
+      List<Map<String, dynamic>> chatsGroups = dynamicChatsGroups
+          .map((chatGroup) => chatGroup as Map<String, dynamic>)
+          .toList();
+
+      // Llamar a _loadChatsWithNewMessages para chats y chatsGroups
+      _loadChatsWithNewMessages(chats);
+      _loadChatsWithNewMessages(
+          chatsGroups); // O usa una función diferente si es necesario
     });
   }
 
@@ -71,6 +91,45 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       //validar si hay una solicitud de llamada
     });
+  }
+
+  void _startPeriodicChatUpdate(List<Map<String, dynamic>> chats,
+      List<Map<String, dynamic>> chatsGroups) {
+    Timer.periodic(Duration(seconds: 1), (timer) {
+      // Llamar a _loadChatsWithNewMessages periódicamente
+      _loadChatsWithNewMessages(chats);
+      _loadChatsWithNewMessages(chatsGroups);
+    });
+  }
+
+// FUNCIÓN PARA VER SI HAY MENSAJES NO LEÍDOS
+  Future<void> _loadChatsWithNewMessages(
+      List<Map<String, dynamic>> chats) async {
+    print("Cargando chats con mensajes no leídos");
+    getCallerInfo();
+    for (var chat in chats) {
+      String chatName = chat['ELEMENTO_NUM'].toString();
+      String nombreCompleto = chat['NOMBRE_COMPLETO']
+          .toString()
+          .replaceAll(' ', ''); // Eliminamos espacios en blanco
+      String? isNewMessage = await CacheService().getData(nombreCompleto);
+      String? prueba = await CacheService().getData('prueba');
+
+      print('###### Valor de prueba: ' + prueba.toString());
+
+      // Mostrar el nombre del chat y el valor encontrado
+      print('Chat: $chatName, Valor encontrado: $isNewMessage' +
+          '  ChatName ' +
+          nombreCompleto);
+
+      if (isNewMessage == 'true') {
+        print(
+            '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@QQQ  Chat con mensajes no leídos: $nombreCompleto');
+        setState(() {
+          chatsWithNewMessages.add(nombreCompleto);
+        });
+      }
+    }
   }
 
 //cargar request de llamadas
@@ -88,7 +147,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     print("callerName: $callerName");
     print("callerNumber: $callerNumber");
 
- final MessageService messageService = MessageService(_numElemento.toString());
+   // final MessageService messageService = MessageService(_numElemento.toString());
 
     if (requestCalling == 'true') {
       requestCallName = callerName!;
@@ -176,15 +235,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _refreshChats() async {
-    setState(() {
-      futureChats = fetchChats();
-      futureChatsGroups = fetchChatsGroups();
+    getCallerInfo();
+    _getrefresh();
+    _loadNumElemento().then((_) async {
+      setState(() {
+        futureChats = fetchChats();
+        futureChatsGroups = fetchChatsGroups();
+      });
+
+      // Esperar a que futureChats y futureChatsGroups se resuelvan con async/await
+      List<dynamic> dynamicChats = await futureChats;
+      List<dynamic> dynamicChatsGroups = await futureChatsGroups;
+
+      // Convertir List<dynamic> a List<Map<String, dynamic>>
+      List<Map<String, dynamic>> chats =
+          dynamicChats.map((chat) => chat as Map<String, dynamic>).toList();
+
+      List<Map<String, dynamic>> chatsGroups = dynamicChatsGroups
+          .map((chatGroup) => chatGroup as Map<String, dynamic>)
+          .toList();
+
+      // Llamar a _loadChatsWithNewMessages para chats y chatsGroups
+      _loadChatsWithNewMessages(chats);
+      _loadChatsWithNewMessages(
+          chatsGroups); // O usa una función diferente si es necesario
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+ return Scaffold(
       appBar: AppBar(
         title: Text('Chats'),
         leading: IconButton(
@@ -196,6 +276,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           },
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Acción para el botón "Nuevo Mensaje"
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NewMessageScreen(),
+                ),
+              );
+            },
+            child: Text(
+              'Agregar contacto',
+              style: TextStyle(color: Color.fromARGB(255, 0, 62, 121)),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -271,7 +368,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         return 0; // Mantener orden original
                       });
                     }
-
                     return ListView.builder(
                       itemCount:
                           filteredChats.length + filteredChatsGroups.length,
@@ -282,22 +378,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               chat['NOMBRE_COMPLETO'].trim().toLowerCase() ==
                                   requestCallName.trim().toLowerCase();
 
-                          print("Es una solicitud de llamada: $isRequestCall");
-
-                          print("inicio de comparacion de llamad------");
-                          print("Nombre del chat de llamada:" +
-                              chat['NOMBRE_COMPLETO']);
-                          print("Nombre de quién hizo la llamada:" +
-                              requestCallName);
-                          print("fin de comparacion de llamad------");
+                          // Verificar si el chat tiene mensajes no leídos
+                          bool hasUnreadMessages = chatsWithNewMessages
+                              .contains(chat['NOMBRE_COMPLETO']
+                                  .toString()
+                                  .replaceAll(' ', ''));
 
                           return Column(
                             children: [
                               Container(
                                 color: isRequestCall
                                     ? Colors.blue
-                                    : Colors
-                                        .transparent, // Color de fondo azul si hay solicitud de llamada
+                                    : hasUnreadMessages
+                                        ? Color.fromARGB(255, 204, 204,
+                                            204) // Fondo gris si hay mensajes no leídos
+                                        : Colors.transparent,
                                 child: ListTile(
                                   leading: Image.asset(
                                     'lib/assets/icons/contact.png',
@@ -305,44 +400,66 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                     height: 48,
                                   ),
                                   title: Text(
-                                    isRequestCall
-                                        ? '${chat['NOMBRE_COMPLETO']}'
-                                        : '${chat['NOMBRE_COMPLETO']}',
+                                    chat['NOMBRE_COMPLETO'],
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: isRequestCall
                                           ? Colors.white
-                                          : Colors
-                                              .black, // Cambiar color de texto si hay solicitud de llamada
+                                          : hasUnreadMessages
+                                              ? Colors.grey[
+                                                  800] // Texto gris oscuro si hay mensajes no leídos
+                                              : Colors.black,
                                     ),
                                   ),
                                   subtitle: Text(
-                                    isRequestCall
-                                        ? 'LLAMADA SOLICITADA'
-                                        : '${chat['ULTIMO_MENSAJE']}',
+                                    hasUnreadMessages
+                                        ? 'Mensajes nuevos...'
+                                        : isRequestCall
+                                            ? 'LLAMADA SOLICITADA'
+                                            : chat['ULTIMO_MENSAJE'],
                                     style: TextStyle(
                                         color: isRequestCall
                                             ? Colors.white70
-                                            : Colors.black54),
+                                            : hasUnreadMessages
+                                                ? const Color.fromARGB(
+                                                    255,
+                                                    0,
+                                                    0,
+                                                    0) // Texto negro si hay mensajes no leídos
+                                                : Colors.black54),
                                   ),
                                   onTap: () async {
                                     final String? elementoLLamante =
                                         await CacheService()
                                             .getData('elementoLLamante');
-                                    print("Valor de elementoLLamante: $elementoLLamante");
-                                    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ -elemento chat: ${chat['ELEMENTO_NUM']}");
+                                    print(
+                                        "Valor de elementoLLamante: $elementoLLamante");
+                                    print(
+                                        "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ -elemento chat: ${chat['ELEMENTO_NUM']}");
 
-                                   
                                     if (elementoLLamante.toString() ==
                                         chat['ELEMENTO_NUM'].toString()) {
-                                           await CacheService()
-                                        .saveData('ringtoneKey', 'false');
-                                    await CacheService()
-                                        .saveData('requestCalling', 'false');
+                                      await CacheService()
+                                          .saveData('ringtoneKey', 'false');
+                                      await CacheService()
+                                          .saveData('requestCalling', 'false');
                                       print(
                                           "|@@··~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  Navegando a ChatListScreen, valor de ringtone: FALSE");
                                     }
-                                    // Navegar a ChatScreen y esperar resultado
+
+                                    String chatElementoNum =
+                                        chat['NOMBRE_COMPLETO']
+                                            .toString()
+                                            .replaceAll(' ', '');
+
+                                    if (chatsWithNewMessages
+                                        .contains(chatElementoNum)) {
+                                      print(
+                                          'Se eliminan los mensajes no leídos para $chatElementoNum');
+                                      await CacheService()
+                                          .saveData(chatElementoNum, 'false');
+                                    }
+
                                     var result =
                                         await Navigator.pushReplacement(
                                       context,
@@ -354,7 +471,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                       ),
                                     );
 
-                                    // Actualizar la lista de chats si se envió un mensaje
                                     if (result != null &&
                                         result is bool &&
                                         result) {
@@ -376,43 +492,88 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         } else {
                           var chatGroup =
                               filteredChatsGroups[index - filteredChats.length];
+                          bool hasUnreadMessagesGroup = chatsWithNewMessages
+                              .contains(chatGroup['NOMBRE_COMPLETO']
+                                  .toString()
+                                  .replaceAll(' ', ''));
+
                           return Column(
                             children: [
-                              ListTile(
-                                leading: Image.asset(
-                                  'lib/assets/icons/chatGroup.png',
-                                  width: 48,
-                                  height: 48,
-                                ),
-                                title: Text(
-                                  '${chatGroup['NOMBRE_COMPLETO']}',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle:
-                                    Text('${chatGroup['ULTIMO_MENSAJE']}'),
-                                onTap: () async {
-                                  // Navegar a ChatScreenGroup y esperar resultado
-                                  var result = await Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatScreenGroup(
-                                        chatData: chatGroup,
-                                        numElemento: _numElemento,
-                                        idGrupo:
-                                            chatGroup['GRUPO_ID'].toString(),
-                                      ),
+                              Container(
+                                color: hasUnreadMessagesGroup
+                                    ? Color.fromARGB(255, 204, 204,
+                                        204) // Fondo gris si hay mensajes no leídos
+                                    : Colors.transparent,
+                                child: ListTile(
+                                  leading: Image.asset(
+                                    'lib/assets/icons/chatGroup.png',
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                  title: Text(
+                                    chatGroup['NOMBRE_COMPLETO'],
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: hasUnreadMessagesGroup
+                                          ? Colors.grey[
+                                              800] // Texto gris oscuro si hay mensajes no leídos
+                                          : Colors.black,
                                     ),
-                                  );
+                                  ),
+                                  subtitle: Text(
+                                    hasUnreadMessagesGroup
+                                        ? 'Mensajes nuevos...'
+                                        : chatGroup['ULTIMO_MENSAJE'].length >
+                                                10
+                                            ? chatGroup['ULTIMO_MENSAJE']
+                                                    .substring(0, 10) +
+                                                '…'
+                                            : chatGroup['ULTIMO_MENSAJE'],
+                                    style: TextStyle(
+                                        color: hasUnreadMessagesGroup
+                                            ? const Color.fromARGB(255, 0, 0,
+                                                0) // Texto negro si hay mensajes no leídos
+                                            : Colors.black54),
+                                  ),
+                                  onTap: () async {
+                                    final String? elementoLLamante =
+                                        await CacheService()
+                                            .getData('elementoLLamante');
 
-                                  // Actualizar la lista de chats si se envió un mensaje
-                                  if (result != null &&
-                                      result is bool &&
-                                      result) {
-                                    setState(() {
-                                      futureChatsGroups = fetchChatsGroups();
-                                    });
-                                  }
-                                },
+                                    String chatElementoNum =
+                                        chatGroup['NOMBRE_COMPLETO']
+                                            .toString()
+                                            .replaceAll(' ', '');
+
+                                    if (chatsWithNewMessages
+                                        .contains(chatElementoNum)) {
+                                      print(
+                                          'Se eliminan los mensajes no leídos para $chatElementoNum');
+                                      await CacheService()
+                                          .saveData(chatElementoNum, 'false');
+                                    }
+                                    var result =
+                                        await Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatScreenGroup(
+                                          chatData: chatGroup,
+                                          numElemento: _numElemento,
+                                          idGrupo:
+                                              chatGroup['GRUPO_ID'].toString(),
+                                        ),
+                                      ),
+                                    );
+
+                                    if (result != null &&
+                                        result is bool &&
+                                        result) {
+                                      setState(() {
+                                        futureChatsGroups = fetchChatsGroups();
+                                      });
+                                    }
+                                  },
+                                ),
                               ),
                               Divider(
                                 color: Colors.grey,
@@ -434,14 +595,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NewMessageScreen(),
-            ),
-          );
+         _refreshChats();
         },
-        child: Icon(Icons.add),
+        child: Icon(Icons.refresh),
       ),
     );
   }

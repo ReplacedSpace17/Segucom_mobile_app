@@ -299,7 +299,7 @@ void onStart(ServiceInstance service) async {
 // INICIA AQUI EL BTON DE PANICO
       NotificationController.startListeningNotificationEvents();
     final VolumeService volumeService = VolumeService(_numElemento, _tel); // Inicializar VolumeService
-final MessageService messageService = MessageService(_numElemento);
+//final MessageService messageService = MessageService(_numElemento);
     //INICIA EL SERVICIO DE UBICACION
 
 /*
