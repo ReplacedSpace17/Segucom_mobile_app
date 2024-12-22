@@ -130,6 +130,7 @@ flutter:
     - lib/assets/icons/iconPaseLista.png
     
     - lib/assets/ringtone.mp3
+    - lib/assets/BLANCO.mp3
     - lib/assets/iconUser.png
     - lib/assets/fondoCall.png
     - lib/assets/certificates/segubackend.com_2024.pem

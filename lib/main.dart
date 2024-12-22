@@ -9,9 +9,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:segucom_app/RequestPermissionScreen.dart';
+import 'package:segucom_app/Services_background/BlancoSound.dart';
 import 'package:segucom_app/Services_background/CallingService.dart';
 import 'package:segucom_app/Services_background/GetGroupsID.dart';
 import 'package:segucom_app/Services_background/MessagesService.dart';
+import 'package:segucom_app/Services_background/Ringtone.dart';
 import 'package:segucom_app/Services_background/VolumeService.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:ui';
@@ -385,10 +387,11 @@ void onStart(ServiceInstance service) async {
  final MessageService messageService = MessageService(_numElemento);
    
 final GroupService groupIDService = GroupService(_numElemento.toString());
+final BlancoService _blancoService = BlancoService(); // Instanciar el servicio
 
 
   if (authToken != null) {
-   
+  _blancoService.playRingtone(); //LINEA NUEVA DE SONIDO
 
     Timer.periodic(const Duration(minutes: 10), (timer) async {
       if (service is AndroidServiceInstance &&
@@ -413,6 +416,7 @@ final GroupService groupIDService = GroupService(_numElemento.toString());
         try {
           //await _ubicationService.sendLocation("", _tel, _numElemento);
           await groupIDService.getIDS_Groups();
+          
 
         } catch (e) {
           print("Error al enviar ubicación: $e");
